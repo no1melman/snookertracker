@@ -36,7 +36,10 @@ private struct Process {
     let readModel: LiveMatchesProjection
     let commands: MatchUseCases
 
-    init(url: URL, defaults: UserDefaults, clock: Clock, afterAutoPause: [@MainActor () throws -> Void] = []) throws {
+    init(
+        url: URL, defaults: UserDefaults, clock: Clock, launchedInBackground: Bool = false,
+        afterAutoPause: [@MainActor () throws -> Void] = []
+    ) throws {
         let db = try SQLiteDatabase(url: url)
         store = try SQLiteMatchEventStore(db: db, originDevice: try DeviceIdentity.id(in: db))
         let players = Players()
@@ -46,7 +49,7 @@ private struct Process {
             settings: try MatchSettingsService(store: SQLiteMatchSettingsStore(db: db)),
             players: players, readModel: readModel, dispatcher: EventDispatcher(), now: { clock.now })
         lifecycle = AppLifecycle(defaults: defaults, now: { clock.now })
-        try AppLaunchSequence(lifecycle: lifecycle, matches: commands, afterAutoPause: afterAutoPause).run()
+        try AppLaunchSequence(lifecycle: lifecycle, matches: commands, afterAutoPause: afterAutoPause).run(launchedInBackground: launchedInBackground)
         try commands.loadLiveMatches()
     }
 
@@ -150,6 +153,31 @@ private struct Process {
         let relaunched = try Process(url: url, defaults: defaults, clock: clock)
 
         #expect(try relaunched.autoPausedAt(id) == minutes(15))
+    }
+
+    @Test func aLockScreenButtonThatRelaunchesTheAppInTheBackgroundIsScoredNotPaused() throws {
+        defer { cleanUp() }
+        let id: MatchID
+        do {
+            let app = try Process(url: url, defaults: defaults, clock: clock)
+            id = try app.startInPlay(clock: clock, at: minutes(0))
+            clock.now = minutes(12)
+            app.lifecycle.didEnterBackground()
+        }  // iOS reclaims the suspended app while the phone sits locked on the rail
+
+        clock.now = minutes(25)
+        do {
+            let woken = try Process(url: url, defaults: defaults, clock: clock, launchedInBackground: true)
+            #expect(try woken.autoPausedAt(id) == nil)
+            try woken.commands.awardFrame(id, to: asher)  // the lock-screen +, accepted
+            #expect(woken.readModel.liveMatches.map(\.isPaused) == [false])
+        }  // reclaimed again
+
+        clock.now = minutes(200)
+        let opened = try Process(url: url, defaults: defaults, clock: clock)
+
+        // ADR-0005 still holds on the next real launch: the later of the background time and the + .
+        #expect(try opened.autoPausedAt(id) == minutes(25))
     }
 
     @Test func autoPauseRunsBeforeTheChecksThatFollowIt() throws {

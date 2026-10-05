@@ -68,7 +68,7 @@ final class AppContainer {
         // S27 before anything reads live matches; then the stale check (S28) once Stats exists.
         try AppLaunchSequence(lifecycle: lifecycle, matches: matchCommands, afterAutoPause: [
             // TODO(spec 020, S28): FlagStaleMatches + stale prompt, when Stats (specs 014/015) lands.
-        ]).run()
+        ]).run(launchedInBackground: AppLifecycle.processLaunchedInBackground)
         try matchCommands.loadLiveMatches()
         #if DEBUG
         seedDemoIfRequested()

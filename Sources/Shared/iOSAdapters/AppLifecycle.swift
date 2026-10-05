@@ -9,6 +9,9 @@ public enum PreviousSession: Equatable, Sendable {
     /// the phone died, a crash). `lastBackgroundAt` is when it last went to the background, or nil if it
     /// was on screen when it died.
     case killed(lastBackgroundAt: Date?)
+    /// iOS started this process in the background to run a lock-screen button (S47). The match is plainly
+    /// still being played, so nothing is auto-paused (ADR-0007); the background time is kept for a later launch.
+    case launchedInBackground
 }
 
 /// App lifecycle anti-corruption adapter (S27, ADR-0004). iOS gives no reliable signal when it kills a
@@ -33,7 +36,15 @@ public final class AppLifecycle {
 
     /// Call once per process, before anything reads live matches. Reports how the previous session
     /// ended and starts a new one (the app is on screen).
-    public func beginSession() -> PreviousSession {
+    ///
+    /// `launchedInBackground`: iOS started this process to run a lock-screen button. That is not the
+    /// user leaving the match, so it isn't treated as a kill (ADR-0007), and the last background time is
+    /// kept: the app is still in the background.
+    public func beginSession(launchedInBackground: Bool = false) -> PreviousSession {
+        if launchedInBackground {
+            defaults.set(true, forKey: Key.sessionStarted)
+            return .launchedInBackground
+        }
         let previous: PreviousSession = defaults.bool(forKey: Key.sessionStarted)
             ? .killed(lastBackgroundAt: defaults.object(forKey: Key.lastBackgroundAt) as? Date)
             : .none
@@ -71,8 +82,8 @@ public struct AppLaunchSequence {
         self.afterAutoPause = afterAutoPause
     }
 
-    public func run() throws {
-        if case .killed(let lastBackgroundAt) = lifecycle.beginSession() {
+    public func run(launchedInBackground: Bool = false) throws {
+        if case .killed(let lastBackgroundAt) = lifecycle.beginSession(launchedInBackground: launchedInBackground) {
             try matches.autoPauseLiveMatches(lastBackgroundAt: lastBackgroundAt)
         }
         for step in afterAutoPause { try step() }

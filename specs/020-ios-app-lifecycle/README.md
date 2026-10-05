@@ -47,3 +47,7 @@ An app lifecycle anti-corruption adapter: auto-pause after the app is killed (S2
 - Checked manually on the simulator
 
 **Implementation skill:** `ddd-application-layer` (ports) · **Tests:** `ddd-testing`
+
+## Progress
+- **Done (S27):** `AutoPauseLiveMatches` + `AppLifecycle` adapter (UserDefaults markers) + `AppLaunchSequence`, run before live matches load. Pause time per ADR-0005. Launches that iOS makes in the background for a lock-screen button skip auto-pause (ADR-0007). Tests: `AutoPauseLiveMatchesTests`, `AppLifecycleTests`.
+- **Remains (S28):** `FlagStaleMatches` and the stale prompt plug into `afterAutoPause` in `AppContainer`, once Stats averages exist (014/015).

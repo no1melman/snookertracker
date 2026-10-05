@@ -74,6 +74,10 @@ From `docs/domain/glossary.md`, split by context (full tables in each canvas):
 | Domain model baseline | [ADR-0001](./docs/adr/0001-domain-model-baseline.md) |
 | Templates and match settings belong to Matches; Players ↔ Matches | [ADR-0002](./docs/adr/0002-templates-and-match-settings-belong-to-matches.md) |
 | Stats built from published events; Stats ↔ Matches | [ADR-0003](./docs/adr/0003-stats-built-from-published-events.md) |
+| Auto-pause detected on relaunch; lock screen shows the oldest live match | [ADR-0004](./docs/adr/0004-auto-pause-on-kill-and-oldest-match-on-lock-screen.md) |
+| Auto-pause at the later of background time and last action | [ADR-0005](./docs/adr/0005-auto-pause-at-later-of-background-and-last-action.md) |
+| A match is event-sourced | [ADR-0006](./docs/adr/0006-a-match-is-event-sourced.md) |
+| No auto-pause when iOS wakes the app for a lock-screen button | [ADR-0007](./docs/adr/0007-no-auto-pause-when-ios-wakes-the-app-for-a-lock-screen-button.md) |
 
 ## Requirements
 

@@ -47,5 +47,5 @@ Q1–Q5 are deferred by the business owner to **revisit during implementation**;
 | Q3 | S5, S15, S16 | What does + do while a Finish/Continue prompt is showing? | discovery | Business owner | deferred |
 | Q4 | S6, S47 | A lock-screen + arrives at the same moment as an in-app −: which wins? | discovery | Business owner | deferred |
 | Q5 | S38 | A match ends while the monthly summary is being made: is it in this month's summary or the next? | discovery | Business owner | deferred |
-| Q6 | S1–S31 (Match) | Record the decision that a match is event-sourced (actions are events on its stream; post-end changes are alterations) as an ADR | requirements | Business owner | open |
+| Q6 | S1–S31 (Match) | Record the decision that a match is event-sourced (actions are events on its stream; post-end changes are alterations) as an ADR | requirements | Business owner | resolved (ADR-0006) |
 | Q7 | S27, S47 | Lock-screen buttons work while the app is in the background, so a frame can be scored after the background time. Pausing at the background time would put the pause before that frame. Pause at the later of the background time and the last action? | requirements | Business owner | resolved (ADR-0005) |

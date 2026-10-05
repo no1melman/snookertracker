@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-10-05
 priority: critical
 tags:
@@ -10,10 +10,13 @@ depends_on:
 - '3'
 parent: '1'
 created_at: 2026-10-05T10:42:31.456414Z
-updated_at: 2026-10-05T19:18:17.239392Z
+updated_at: 2026-10-05T21:11:50.884457Z
+completed_at: 2026-10-05T21:11:50.884457Z
 transitions:
 - status: in-progress
   at: 2026-10-05T19:18:17.239392Z
+- status: complete
+  at: 2026-10-05T21:11:50.884457Z
 ---
 
 # Match aggregate: live play
@@ -22,7 +25,7 @@ transitions:
 The event-sourced `Match` aggregate for live play, from starting a match to scoring it. Source: `docs/ddd-requirements.md` › Matches › Match › Aggregate and Domain Events. Scenarios S1, S2, S4–S8, S15, S16, S27, S41, S46, S47.
 
 ## Requirements
-- [ ] First: record the event-sourcing decision as an ADR (closes **Q6**) in `docs/adr/` and mark Q6 resolved in `docs/domain/decisions.md`
+- [x] First: record the event-sourcing decision as an ADR (closes **Q6**) in `docs/adr/` and mark Q6 resolved in `docs/domain/decisions.md`
 - [x] `Match.start(setup, at:)`: players distinct, targets valid. Starts in AwaitingBreaker at 0–0, with the match and frame-1 timers starting at `at`. Raises `MatchStarted` (incl. Setup, start time).
 - [x] `chooseBreaker(side)`: AwaitingBreaker and not paused → InPlay. Raises `BreakerChosen`.
 - [x] `correctBreaker(side)`: live; resets the break-rule origin. Raises `BreakerCorrected`.
@@ -63,4 +66,4 @@ The event-sourced `Match` aggregate for live play, from starting a match to scor
   - `correctBreaker` is allowed in InPlay and Paused, and refused in AwaitingConfirmation and before a breaker exists (`theBreakerCannotBeCorrectedWhileAwaitingConfirmation`).
   - Q3 (+ while the Finish/Continue prompt shows): `awardFrame` is refused in AwaitingConfirmation, so + is disabled until Finish or Undo.
   - Set wins and scores come from a pure `Tally` over the frame list, so removing a frame reverts its set win.
-- **Remains:** write the event-sourcing ADR in `docs/adr/` and mark Q6 resolved in `docs/domain/decisions.md`. Q6 is still `open`.
+- **Done:** event-sourcing ADR recorded as ADR-0006; Q6 resolved.
