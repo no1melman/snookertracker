@@ -1,0 +1,61 @@
+---
+status: planned
+created: 2026-10-05
+priority: critical
+tags:
+- matches
+- application
+depends_on:
+- '4'
+- '6'
+- '7'
+- '9'
+parent: '1'
+created_at: 2026-10-05T10:42:31.483846Z
+updated_at: 2026-10-05T10:42:31.483846Z
+---
+
+# Match use cases: start & play
+
+## Overview
+Command-side use cases for starting and playing a match. Source: `docs/ddd-requirements.md` › Matches › Match › Use Cases. Scenarios S1, S2, S4–S8, S11, S41, S44, S46, S47.
+
+**Also depends on** 008 (starting from a template needs `TemplateList`). Not in frontmatter: `leanspec rel` is not migrated yet.
+
+## Requirements
+- [ ] `StartMatch`:
+  - Triggered by the Scorer, from a template or from entered details
+  - Enforces the live-match limit from `MatchSettings`
+  - Asks "already in a live match?" (`IsPlayerInLiveMatch`)
+  - Load settings → `Match.start` → save → dispatch
+- [ ] `ChooseBreaker` and `CorrectBreaker` (from the match menu)
+- [ ] `AwardFrame` (in the app or on the lock screen). **Resolve Q3** (+ while a Finish/Continue prompt shows) and **Q4** (lock-screen + vs in-app −) with the business owner. Record each answer through `/ddd delta`.
+- [ ] `RemoveFrame` (−, or Undo on a prompt)
+- [ ] `PauseMatch` and `ResumeMatch` (in the app or on the lock screen)
+- [ ] `OverrideMatchColour`: policy on `MatchStarted` when the sides share a colour and the Scorer accepts
+- [ ] Every use case follows load → mutate → save → dispatch
+
+## UI (design language: 022)
+- [ ] **New Game › Enter details:**
+  - Game, and players from `PlayerSuggestions` with inline add (011)
+  - Style and targets as "race to" or "best of", odd numbers only
+  - Break rule, with defaults from 007
+- [ ] **Start outcomes:**
+  - The live-match limit refusal is an alert that explains the limit and links to Settings
+  - The "already in a live match?" confirmation
+  - The colour clash (S46) is a confirmation offering a temporary colour
+- [ ] **Choose breaker:** tap a player, then the live screen opens
+- [ ] **Live screen controls:**
+  - Per player, a large **+** and a smaller, secondary **−**, both with haptics
+  - Pause and Resume in the toolbar; Correct breaker in the ⋯ menu
+  - Disabled when there is no breaker, when paused, and − at 0
+
+## Non-goals
+- Ending and stale use cases (separate spec)
+- iOS lock-screen wiring (Live Activity spec)
+
+## Acceptance criteria
+- One integration test per use case, including the live-match limit refusal and the "already live" confirmation
+- Q3 and Q4 are answered and recorded, or explicitly re-deferred in `docs/domain/decisions.md`
+
+**Implementation skill:** `ddd-application-layer` · **Tests:** `ddd-testing`
