@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-10-05
 priority: critical
 tags:
@@ -10,10 +10,13 @@ depends_on:
 - '4'
 parent: '1'
 created_at: 2026-10-05T10:42:31.466873Z
-updated_at: 2026-10-05T20:21:31.981470Z
+updated_at: 2026-10-05T20:51:19.467398Z
+completed_at: 2026-10-05T20:51:19.467398Z
 transitions:
 - status: in-progress
   at: 2026-10-05T20:21:31.981470Z
+- status: complete
+  at: 2026-10-05T20:51:19.467398Z
 ---
 
 # Match event store & repository
@@ -22,13 +25,13 @@ transitions:
 Event-sourced persistence for `Match` and the `MatchRepository` port. Source: `docs/ddd-requirements.md` › Matches › Match › Repository Port and Persistence note, plus Design-for-later constraints.
 
 ## Requirements
-- [ ] An append-only event store on the device's local database, one stream per match, with optimistic concurrency on the stream version
-- [ ] `MatchRepository`: `getById` (rehydrate) and `save` (append new events, then dispatch)
-- [ ] `findLive()`: live matches, oldest started first
-- [ ] `findByPlayer(PlayerId)`: every match with that player
-- [ ] Event serialisation is versioned (Stage 2 events are a published contract)
-- [ ] Design for later: a stream can accept events from more than one device (event ids and origin device, no single-writer assumption)
-- [ ] Every stream can be read in full, in order (used by the export spec)
+- [x] An append-only event store on the device's local database, one stream per match, with optimistic concurrency on the stream version
+- [x] `MatchRepository`: `getById` (rehydrate) and `save` (append new events, then dispatch)
+- [x] `findLive()`: live matches, oldest started first
+- [x] `findByPlayer(PlayerId)`: every match with that player
+- [x] Event serialisation is versioned (Stage 2 events are a published contract)
+- [x] Design for later: a stream can accept events from more than one device (event ids and origin device, no single-writer assumption)
+- [x] Every stream can be read in full, in order (used by the export spec)
 
 ## Non-goals
 - Snapshots (add only if rehydration is measurably slow)
@@ -43,3 +46,15 @@ Event-sourced persistence for `Match` and the `MatchRepository` port. Source: `d
   - Reading a full stream in order
 
 **Implementation skills:** `ddd-event-sourcing`, `ddd-repositories` · **Tests:** `ddd-testing`
+
+## Progress
+- **Done (2026-10-05 audit):** `SQLiteMatchEventStore` and `EventSourcedMatchRepository` are in `Sources/Matches/Infrastructure/SQLite/`, behind the `MatchRepository` port in `Sources/Matches/Application/MatchRepository.swift`.
+  - Events are append-only in `match_events`, with `UNIQUE(stream_id, version)` and a version check inside the transaction.
+  - `match_streams` is a derived index that `findLive` and `findByPlayer` query.
+- Integration tests in `Tests/Matches/IntegrationTests/MatchesIntegrationTests.swift` cover the round-trip, the concurrency conflict, `findLive` ordering, `findByPlayer`, reading a full stream in order with event ids and origin device, and the wire versioning.
+- **Decisions:**
+  - SQLite (system SQLite3 through the `SQLiteSupport` module) is the persistence engine: one DB file per device.
+  - Events are serialised by `MatchEventWire`: a stable type name, a schema version and a JSON payload. The store and the published `MatchEventPublished` share it.
+  - Dispatch happens in the use cases after `save`, not inside the repository.
+  - `allStreams()` and `readStream()` serve the export spec.
+- **Remains:** nothing.

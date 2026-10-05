@@ -7,7 +7,7 @@ import MatchesPublished
 /// load → domain behaviour → save → dispatch Stage 2 events → update the read model.
 @MainActor
 public final class MatchUseCases: MatchCommands {
-    private let repository: any MatchRepository
+    let repository: any MatchRepository
     private let settings: MatchSettingsService
     private let players: any MatchPlayerDirectory
     private let readModel: LiveMatchesProjection
@@ -105,7 +105,7 @@ public final class MatchUseCases: MatchCommands {
     }
 
     /// save → dispatch → project. Events are dispatched only once they are stored.
-    private func commit(_ match: Match) throws {
+    func commit(_ match: Match) throws {
         let recorded: [RecordedMatchEvent]
         do {
             recorded = try repository.save(match)

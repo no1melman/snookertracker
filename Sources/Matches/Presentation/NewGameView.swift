@@ -2,8 +2,10 @@ import DesignSystem
 import MatchesApplication
 import SwiftUI
 
-/// New Game › Enter details (spec 010): two players, game, style and targets, break rule.
-/// Starting opens the live screen, which asks who breaks.
+/// New Game: recent setups (`TemplateList`, spec 008) on top, most used first: one tap starts that
+/// match, swipe deletes the template. Below, Enter details (spec 010): two players, game, style and
+/// targets, break rule. With no templates the screen is just the details step.
+/// Starting either way opens the live screen, which asks who breaks.
 public struct NewGameView: View {
     let onStart: (MatchID) -> Void
     @Environment(\.matchesPorts) private var ports
@@ -21,7 +23,19 @@ public struct NewGameView: View {
 
     public var body: some View {
         let players = ports?.players.suggestions ?? []
+        let templates = ports?.templates?.templates ?? []
         Form {
+            if !templates.isEmpty {
+                Section("Recent") {
+                    ForEach(templates) { template in
+                        TemplateRowButton(template: template) { start(template.setup) }
+                            .swipeActions {
+                                Button("Delete", systemImage: "trash", role: .destructive) { delete(template) }
+                            }
+                    }
+                }
+            }
+
             Section {
                 ForEach(players) { player in
                     Button { toggle(player.id) } label: {
@@ -48,7 +62,7 @@ public struct NewGameView: View {
                         .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             } header: {
-                Text("Players")
+                Text(templates.isEmpty ? "Players" : "Or enter details")
             } footer: {
                 Text("Pick two.")
             }
@@ -114,11 +128,65 @@ public struct NewGameView: View {
     }
 
     private func start() {
+        start(MatchSetup(players: selected, game: game, style: style, breakRule: breakRule))
+    }
+
+    private func start(_ setup: MatchSetup) {
         guard let ports else { return }
         attempt($error) {
-            let id = try ports.commands.startMatch(MatchSetup(players: selected, game: game, style: style, breakRule: breakRule))
+            let id = try ports.commands.startMatch(setup)
             onStart(id)
         }
+    }
+
+    private func delete(_ template: TemplateRow) {
+        guard let commands = ports?.templateCommands else { return }
+        attempt($error) { try commands.deleteTemplate(template.id) }
+    }
+}
+
+/// One recent setup: both players' plates, then the game, the style and targets as entered and the
+/// break rule. Tapping it starts that match.
+struct TemplateRowButton: View {
+    let template: TemplateRow
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 10) {
+                        ForEach(Array(template.players.enumerated()), id: \.offset) { i, player in
+                            if i > 0 { Text("v").font(.subheadline).foregroundStyle(.secondary) }
+                            PlayerPlate(name: player.name, colour: PlayerColour.color(player.colour))
+                                .font(.body.weight(.semibold))
+                        }
+                    }
+                    Text(details)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "play.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(Color.accentColor)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+            .frame(minHeight: 44)
+            .padding(.vertical, 2)
+        }
+        .tint(.primary)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(template.players.map(\.name).joined(separator: " v ")), \(details)")
+        .accessibilityHint("Starts this match")
+        .accessibilityAddTraits(.isButton)
+    }
+
+    /// "Pool · Race to 5 · Alternate breaks"
+    private var details: String {
+        let rule = template.breakRule == .alternate ? "Alternate breaks" : "Winner breaks"
+        return [template.game.title, template.style.title, rule].joined(separator: " · ")
     }
 }
 

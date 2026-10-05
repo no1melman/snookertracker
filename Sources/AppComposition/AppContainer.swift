@@ -1,4 +1,5 @@
 import EventDispatch
+import iOSAdapters
 import Foundation
 import MatchesApplication
 import MatchesInfrastructure
@@ -7,6 +8,9 @@ import PlayersApplication
 import PlayersInfrastructure
 import PlayersPresentation
 import SQLiteSupport
+import StatsApplication
+import StatsInfrastructure
+import StatsPresentation
 
 /// Composition root: opens the device database, builds the adapters and use cases, and hands their
 /// ports to the presentation layer. One container per process (`shared`).
@@ -18,8 +22,12 @@ final class AppContainer {
     let matchSettings: MatchSettingsService
     let liveMatches: LiveMatchesProjection
     let matchCommands: MatchUseCases
+    let templateList: TemplateListProjection
+    let templateCommands: TemplateUseCases
+    let lifecycle: AppLifecycle
+    let matchRecords: MatchRecordsProjection
     private let directory: PlayersForMatches
-    private let dispatcher = EventDispatcher()
+    let dispatcher = EventDispatcher()
 
     private convenience init() {
         do {
@@ -30,7 +38,8 @@ final class AppContainer {
         }
     }
 
-    init(database db: SQLiteDatabase) throws {
+    init(database db: SQLiteDatabase, lifecycle: AppLifecycle = AppLifecycle()) throws {
+        self.lifecycle = lifecycle
         let playerRepository = try SQLitePlayerRepository(db: db)
         players = try PlayersService(
             repository: playerRepository, reader: playerRepository, meStore: SQLiteMeSettingStore(db: db),
@@ -39,9 +48,27 @@ final class AppContainer {
         matchSettings = try MatchSettingsService(store: SQLiteMatchSettingsStore(db: db))
         liveMatches = LiveMatchesProjection(players: directory)
         let store = try SQLiteMatchEventStore(db: db, originDevice: DeviceIdentity.id(in: db))
+        // Stats (spec 013): subscribe before any command can dispatch, then catch up on everything
+        // Matches published before Stats existed (or since it last ran), via Matches' open host replay.
+        matchRecords = try MatchRecordsProjection(store: SQLiteStatsStore(db: db))
+        matchRecords.subscribe(to: dispatcher)
+        try matchRecords.seedPlayers(players.players.map {
+            StatsPlayer(id: $0.id, name: $0.name, colour: $0.colour, isArchived: $0.isArchived)
+        })
+        try matchRecords.catchUp(from: SQLiteMatchEventHistory(db: db, store: store))
         matchCommands = MatchUseCases(
             repository: EventSourcedMatchRepository(store: store), settings: matchSettings, players: directory,
             readModel: liveMatches, dispatcher: dispatcher)
+        // Templates (spec 008): CreateOrUseTemplate reacts to MatchStarted once it is stored.
+        let templateRepository = try SQLiteTemplateRepository(db: db)
+        templateList = TemplateListProjection(reader: templateRepository, players: directory)
+        templateCommands = TemplateUseCases(repository: templateRepository, list: templateList)
+        templateCommands.subscribe(to: dispatcher)
+        try templateCommands.loadTemplates()
+        // S27 before anything reads live matches; then the stale check (S28) once Stats exists.
+        try AppLaunchSequence(lifecycle: lifecycle, matches: matchCommands, afterAutoPause: [
+            // TODO(spec 020, S28): FlagStaleMatches + stale prompt, when Stats (specs 014/015) lands.
+        ]).run()
         try matchCommands.loadLiveMatches()
         #if DEBUG
         seedDemoIfRequested()
@@ -58,8 +85,10 @@ final class AppContainer {
 
     var matchesPorts: MatchesPorts {
         MatchesPorts(live: liveMatches, screens: liveMatches, commands: matchCommands, settings: matchSettings,
-                     players: directory)
+                     players: directory, templates: templateList, templateCommands: templateCommands)
     }
+
+    var statsPorts: StatsPorts { StatsPorts(history: matchRecords) }
 }
 
 /// Customer/supplier adapter: Players as Matches sees it (`MatchPlayerDirectory`).
@@ -105,9 +134,18 @@ extension AppContainer {
             try? matches.awardFrame(m2, to: me)
             try? matches.pauseMatch(m2)
         }
+        // Earlier, cancelled starts, so New Game has templates with different use counts (spec 008).
+        for setup in [
+            MatchSetup(players: [asher, me], game: .pool, style: .raceTo(5), breakRule: .alternate),
+            MatchSetup(players: [asher, me], game: .pool, style: .raceTo(5), breakRule: .alternate),
+            MatchSetup(players: [dev, asher], game: .pool, style: .mostFramesWins, breakRule: .alternate),
+        ] {
+            if let id = try? matches.startMatch(setup) { try? matches.cancelMatch(id) }
+        }
+        seedHistoryDemo(me: me, asher: asher, dev: dev)
     }
 
-    /// `-uiRoute live|newGame|players|settings` opens that screen at launch.
+    /// `-uiRoute live|newGame|players|settings|history|match` opens that screen at launch.
     var demoRoute: String? {
         let args = ProcessInfo.processInfo.arguments
         guard let i = args.firstIndex(of: "-uiRoute"), i + 1 < args.count else { return nil }

@@ -1,6 +1,8 @@
 import DesignSystem
+import iOSAdapters
 import MatchesPresentation
 import PlayersPresentation
+import StatsPresentation
 import SwiftUI
 
 /// The app's root view: wires the ports into the environment and shows Welcome until Me exists.
@@ -22,6 +24,8 @@ public struct AppRoot: View {
         HubView(initialRoute: initialRoute)
             .environment(\.matchesPorts, container.matchesPorts)
             .environment(\.playersPorts, container.playersPorts)
+            .environment(\.statsPorts, container.statsPorts)
+            .recordsAppLifecycle(container.lifecycle)
             #if os(iOS)
             .fullScreenCover(isPresented: .constant(needsWelcome)) {
                 WelcomeView().environment(\.playersPorts, container.playersPorts)

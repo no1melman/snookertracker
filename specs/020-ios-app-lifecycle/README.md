@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-10-05
 priority: medium
 tags:
@@ -9,7 +9,10 @@ depends_on:
 - '15'
 parent: '1'
 created_at: 2026-10-05T10:42:31.524838Z
-updated_at: 2026-10-05T10:42:31.524838Z
+updated_at: 2026-10-05T20:46:01.144353Z
+transitions:
+- status: in-progress
+  at: 2026-10-05T20:46:01.144353Z
 ---
 
 # iOS app lifecycle adapter

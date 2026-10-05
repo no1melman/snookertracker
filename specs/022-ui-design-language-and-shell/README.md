@@ -43,7 +43,7 @@ This spec owns the design language, the hub shell and the Settings container. Ea
   - Then rows for History, Stats, Series, Players and Settings, and "Me (name)" (012)
 - [ ] **Settings** (an inset grouped list) contains the match defaults and live-match limit (007), Me and Replay walkthrough (012)
 - [ ] A shared **player plate** component (colour plate plus name) used on every screen; archived players are greyed
-- [ ] A shared **score numeral** style: monospaced digits that scale with Dynamic Type
+- [x] A shared **score numeral** style: monospaced digits that scale with Dynamic Type
 
 ### Screen map
 | Screen | Owning specs |
@@ -86,6 +86,20 @@ This spec owns the design language, the hub shell and the Settings container. Ea
 - A live score reads from arm's length on a phone lying on a table
 - Screen requirements are spread into the owning specs (done 2026-10-05; see the screen map)
 - Impeccable finish review passes; DESIGN.md records the tokens actually used
+
+## Progress
+- **Done (2026-10-05 audit):**
+  - `HubView` (`Sources/AppComposition/Shell/`) is one `NavigationStack` with a large title and no tab bar. It has New Game first, the Live section (009), then History, Stats, Series, Players and Settings, and a Me row.
+  - `SettingsView` is a `Form` holding the match defaults, the limit stepper and Me.
+  - `DesignSystem` provides `ScoreNumeral` (monospaced, `@ScaledMetric` hero size), `PlayerPlate` (archived rows greyed), `PlayerColour` and haptics on +/−.
+- **Decisions:** the tint and the 12-colour palette are placeholders (`Theme.swift`) until the open decision is made. History, Stats and Series rows open a "Coming soon" placeholder.
+- **Remains:**
+  - Finish all in the Live section (015).
+  - Replay walkthrough in Settings (012).
+  - The live screen draws its own capsule plate instead of using `PlayerPlate`.
+  - The real History, Stats and Series screens.
+  - The simulator checks in Light, Dark and large Dynamic Type.
+  - The Impeccable finish review and `DESIGN.md`, which doesn't exist yet.
 
 ## Notes
 - Shaped with `/impeccable shape` on 2026-10-05. The decision round was offered several invented visual worlds; the user chose the native category standard.

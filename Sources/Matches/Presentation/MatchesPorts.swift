@@ -8,16 +8,22 @@ public struct MatchesPorts: Sendable {
     public let commands: any MatchCommands
     public let settings: any MatchSettings
     public let players: any MatchPlayerDirectory
+    /// `TemplateList` and `DeleteTemplate` (spec 008); nil shows New Game without templates.
+    public let templates: (any TemplateListQuery)?
+    public let templateCommands: (any TemplateCommands)?
 
     public init(
         live: any LiveMatchesQuery, screens: any LiveMatchScreenQuery, commands: any MatchCommands,
-        settings: any MatchSettings, players: any MatchPlayerDirectory
+        settings: any MatchSettings, players: any MatchPlayerDirectory,
+        templates: (any TemplateListQuery)? = nil, templateCommands: (any TemplateCommands)? = nil
     ) {
         self.live = live
         self.screens = screens
         self.commands = commands
         self.settings = settings
         self.players = players
+        self.templates = templates
+        self.templateCommands = templateCommands
     }
 }
 

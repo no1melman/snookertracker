@@ -18,9 +18,14 @@ targets:
     platform: iOS
     sources:
       - path: App
+      # Lock-screen App Intents: performed in the app process (LiveActivityIntent), also built into the widget.
+      - path: LiveActivityWidget/Intents
     dependencies:
       - package: SnookerTracker
         product: AppComposition
+      - package: SnookerTracker
+        product: LiveActivityShared
+      - target: LiveActivityWidget
     info:
       path: App/Info.plist
       properties:
@@ -29,10 +34,37 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIApplicationSupportsIndirectInputEvents: true
+        NSSupportsLiveActivities: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.melman.snookertracker
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+  # Live Activity UI (spec 018). No App Group, no push: it renders ActivityKit content the app sends.
+  LiveActivityWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: LiveActivityWidget
+    dependencies:
+      - package: SnookerTracker
+        product: LiveActivityShared
+      - package: SnookerTracker
+        product: DesignSystem
+      - sdk: SwiftUI.framework
+      - sdk: WidgetKit.framework
+    info:
+      path: LiveActivityWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Snooker
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.melman.snookertracker.LiveActivity
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: YES
         MARKETING_VERSION: "0.1"

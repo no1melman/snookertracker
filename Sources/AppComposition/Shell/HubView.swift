@@ -1,12 +1,15 @@
 import DesignSystem
 import MatchesPresentation
 import PlayersPresentation
+import StatsApplication
+import StatsPresentation
 import SwiftUI
 
 /// The hub (spec 022): root of one NavigationStack, large title, no tab bar.
 struct HubView: View {
     @Environment(\.playersPorts) private var players
     @Environment(\.matchesPorts) private var matches
+    @Environment(\.statsPorts) private var stats
     @State private var path = NavigationPath()
     let initialRoute: String?
 
@@ -63,7 +66,13 @@ struct HubView: View {
                 case .players: PlayersView()
                 case .settings: SettingsView()
                 case .me: MeView()
+                case .history: HistoryView()
                 default: PlaceholderScreen(title: destination.title)
+                }
+            }
+            .navigationDestination(for: StatsRoute.self) { route in
+                switch route {
+                case .match(let id): MatchDetailView(matchID: id)
                 }
             }
         }
@@ -76,6 +85,10 @@ struct HubView: View {
         case "newGame": path.append(MatchRoute.newGame)
         case "players": path.append(HubDestination.players)
         case "settings": path.append(HubDestination.settings)
+        case "history": path.append(HubDestination.history)
+        case "match":
+            path.append(HubDestination.history)
+            if let id = stats?.history.pastMatches(PastMatchesFilter()).first?.id { path.append(StatsRoute.match(id)) }
         default: break
         }
     }

@@ -45,22 +45,48 @@ for c in contexts {
     ]
 }
 
+// Live Activity content + lock-screen command route, shared by the app and the widget extension (spec 018).
+targets.append(.target(name: "LiveActivityShared", path: "Sources/Shared/LiveActivityShared"))
+
 // iOS anti-corruption layer: UserNotifications, ActivityKit + App Intents, app lifecycle.
 targets.append(.target(
     name: "iOSAdapters",
-    dependencies: contexts.flatMap { [Target.Dependency(stringLiteral: "\($0)Application"), Target.Dependency(stringLiteral: "\($0)Published")] },
+    dependencies: contexts.flatMap { [Target.Dependency(stringLiteral: "\($0)Application"), Target.Dependency(stringLiteral: "\($0)Published")] }
+        + ["EventDispatch", "LiveActivityShared"],
     path: "Sources/Shared/iOSAdapters"))
+// App lifecycle adapter + AutoPauseLiveMatches over real SQLite and a scratch UserDefaults suite (spec 020).
+targets.append(.testTarget(
+    name: "AppLifecycleTests",
+    dependencies: ["iOSAdapters", "MatchesApplication", "MatchesInfrastructure", "MatchesDomain", "EventDispatch", "SQLiteSupport"],
+    path: "Tests/Shared/AppLifecycleTests"))
+targets.append(.testTarget(
+    name: "iOSAdaptersTests",
+    dependencies: ["iOSAdapters", "LiveActivityShared", "EventDispatch", "SQLiteSupport", "MatchesApplication", "MatchesDomain", "MatchesInfrastructure"],
+    path: "Tests/Shared/iOSAdaptersTests"))
+
+// Stats is conformist to Matches' published language (ADR-0003): these tests feed Stats real Matches
+// events (real use cases, the real event store and its open-host replay), not hand-written payloads.
+targets.append(.testTarget(
+    name: "StatsContractTests",
+    dependencies: ["StatsApplication", "StatsInfrastructure", "MatchesDomain", "MatchesApplication",
+                   "MatchesInfrastructure", "MatchesPublished", "PlayersPublished", "EventDispatch", "SQLiteSupport"],
+    path: "Tests/Stats/ContractTests"))
 
 // Composition root module: wires every context; the Xcode app target is a thin @main over it.
 targets.append(.target(
     name: "AppComposition",
-    dependencies: ["EventDispatch", "DesignSystem", "iOSAdapters", "SQLiteSupport"]
+    dependencies: ["EventDispatch", "DesignSystem", "iOSAdapters", "LiveActivityShared", "SQLiteSupport"]
         + contexts.flatMap { c in ["Application", "Infrastructure", "Presentation"].map { Target.Dependency(stringLiteral: "\(c)\($0)") } },
     path: "Sources/AppComposition"))
 
 let package = Package(
     name: "SnookerTracker",
     platforms: [.iOS(.v17), .macOS(.v14)],
-    products: [.library(name: "AppComposition", targets: ["AppComposition"])],
+    products: [
+        .library(name: "AppComposition", targets: ["AppComposition"]),
+        // The Live Activity widget extension links only these two (spec 018).
+        .library(name: "LiveActivityShared", targets: ["LiveActivityShared"]),
+        .library(name: "DesignSystem", targets: ["DesignSystem"]),
+    ],
     targets: targets
 )
