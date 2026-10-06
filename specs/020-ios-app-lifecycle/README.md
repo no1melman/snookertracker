@@ -26,12 +26,12 @@ An app lifecycle anti-corruption adapter: auto-pause after the app is killed (S2
 - [x] On launch, detect that the last session was killed (it never returned to the foreground cleanly). iOS gives no reliable termination signal for a suspended app, so detection happens here, not in `willTerminate`.
 - [x] After a kill, invoke `AutoPauseLiveMatches` with the recorded background time (or none). The use case pauses each match at the later of that time and its last action.
 - [ ] Then invoke `FlagStaleMatches` and present the stale prompt one match at a time, sending the choice to `ResolveStaleMatch`
-  - Partial: not built. `AppContainer` has only a TODO in `afterAutoPause`, and there is no `FlagStaleMatches` use case.
+  - Partial: the use cases, the queue and the prompt are built; the `afterAutoPause` step and the `.stalePrompt` call in the composition root are not wired yet.
 - [x] No lifecycle types leak into the application or domain layers
 
 ## UI (design language: 022)
 - [ ] The **stale prompt** is a system alert or sheet, one match at a time:
-  - Partial: not built (depends on `FlagStaleMatches`).
+  - Partial: built as `.stalePrompt(queue)` (`Matches/Presentation/StalePrompt.swift`), not yet attached in `AppRoot`.
   - It shows the players, the score and how long the match has been idle
   - Its options are the choices `ResolveStaleMatch` offers
 
@@ -56,3 +56,8 @@ An app lifecycle anti-corruption adapter: auto-pause after the app is killed (S2
 
 ## Progress (2026-10-06)
 - Verified: ticked the first four items and the no-leak item. `AppLifecycle` records the background time on `.background`, clears it on `.active`, detects a kill on the next launch and `AppLaunchSequence` calls `autoPauseLiveMatches` before the `afterAutoPause` steps. Lifecycle types live only in `Shared/iOSAdapters`, and `AppLifecycleTests` (7) cover the kill and background cases. Open: `FlagStaleMatches` and the stale prompt, and the S28 integration test.
+
+## Progress (S28)
+- `StaleMatchQueue` (`@Observable`, `Matches/Application/Stale/`) holds the prompts: `flag()` runs `FlagStaleMatches`, `current` is the match being asked about, `resolve(choice, anyway:)` runs `ResolveStaleMatch` and moves on. A match played or ended meanwhile is skipped quietly; any other refusal keeps it.
+- `.stalePrompt(queue)` presents `current` as a sheet that can't be swiped away: players and score, idle time, Ran and Capped side by side (with where the cap comes from), Resume, End at a time (picker bounded by the last action and the flag time, starting at the suggestion), End with capped length, Abandon and Cancel (with the live screen's confirmations; hidden while awaiting a target confirmation). Short of the target asks "Finish Anyway".
+- Left: wire `queue.flag()` into `afterAutoPause` and `.stalePrompt` into `AppRoot`; the "auto-pause runs before the stale check" integration test (needs `AppLifecycleTests` + the Stale use cases); checking on the simulator.

@@ -29,6 +29,7 @@ public struct AppRoot: View {
             .environment(\.matchDetailActions, container.matchDetailActions)
             .environment(\.archivePlayer, container.archivePlayer)
             .recordsAppLifecycle(container.lifecycle)
+            .stalePrompt(needsWelcome ? nil : container.staleMatches)
             #if os(iOS)
             .fullScreenCover(isPresented: .constant(needsWelcome)) {
                 WelcomeView().environment(\.playersPorts, container.playersPorts)

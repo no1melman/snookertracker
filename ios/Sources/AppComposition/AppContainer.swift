@@ -22,6 +22,7 @@ final class AppContainer {
     let matchSettings: MatchSettingsService
     let liveMatches: LiveMatchesProjection
     let matchCommands: MatchUseCases
+    let staleMatches: StaleMatchQueue
     let templateList: TemplateListProjection
     let templateCommands: TemplateUseCases
     let lifecycle: AppLifecycle
@@ -72,6 +73,8 @@ final class AppContainer {
         matchCommands = MatchUseCases(
             repository: EventSourcedMatchRepository(store: store), settings: matchSettings, players: directory,
             readModel: liveMatches, dispatcher: dispatcher)
+        staleMatches = StaleMatchQueue(commands: StaleMatchUseCases(
+            matches: matchCommands, stats: matchRecords, players: directory))
         // Templates (spec 008): CreateOrUseTemplate reacts to MatchStarted once it is stored.
         let templateRepository = try SQLiteTemplateRepository(db: db)
         templateList = TemplateListProjection(reader: templateRepository, players: directory)
@@ -93,7 +96,7 @@ final class AppContainer {
         players.matchQueries = MatchesForPlayers(matches: matchCommands)
         // S27 before anything reads live matches; then the stale check (S28) once Stats exists.
         try AppLaunchSequence(lifecycle: lifecycle, matches: matchCommands, afterAutoPause: [
-            // TODO(spec 020, S28): FlagStaleMatches + stale prompt, when Stats (specs 014/015) lands.
+            { [staleMatches] in try staleMatches.flag() },
         ]).run(launchedInBackground: AppLifecycle.processLaunchedInBackground)
         try matchCommands.loadLiveMatches()
         #if DEBUG

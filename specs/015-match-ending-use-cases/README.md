@@ -30,11 +30,11 @@ Command-side use cases for ending, maintaining and cleaning up matches. Source: 
   - Input: the last background time, if recorded
   - `findLive` → `autoPause(at:)` each running match, `at` = the later of the background time and that match's last action (the last action when none was recorded)
   - Already-paused matches untouched; runs before `FlagStaleMatches`
-- [ ] `FlagStaleMatches`:
+- [x] `FlagStaleMatches`:
   - `findLive`, filtered by idle ≥ 6 h
   - Queries Stats' `AverageFrameTime` and `AverageMatchLength` (3 h fallback)
   - Prompts one match at a time
-- [ ] `ResolveStaleMatch`
+- [x] `ResolveStaleMatch`: resume, end at a chosen time, end capped, abandon, cancel (S28)
 - [ ] `WarnLongFrame` (Clock-triggered): define a `NotificationScheduler` port here and test against an in-memory fake; the UserNotifications adapter is in 019
 - [x] `CorrectMatchScore` (timeline → Edit). Q1 and Q2 re-deferred (see Progress).
 - [x] `MarkMatchFinished`
@@ -79,3 +79,10 @@ Command-side use cases for ending, maintaining and cleaning up matches. Source: 
 - Q1 (phone dies mid-correction) and Q2 (two corrections in a row) stay **deferred**: the scenarios don't decide them. Defaults as built: a correction is one event, stored whole or not at all; a second correction builds on the first (its frames start from the corrected ones) and each is its own entry in the timeline's Alterations.
 - Tests (`MatchesIntegrationTests`): Finish all with mixed matches (most frames, target reached, paused short of target), Finish all with no warning, race-to correction on/off target, two corrections, sets warnings confirmed before saving, cancelled not correctable, mark finished.
 - Left for round 2: `AutoPauseLiveMatches` items still unticked here, `FlagStaleMatches`, `ResolveStaleMatch`, `WarnLongFrame`; the Continue? prompt (above).
+
+## Progress (S28, stale matches)
+- `FlagStaleMatches` / `ResolveStaleMatch` are `StaleMatchCommands`, built by `StaleMatchUseCases` in `Matches/Application/Stale/`. It reuses `MatchUseCases`' repository and `commit` (both internal), so it saves, publishes and projects like every other command; `MatchUseCases` is unchanged.
+- Flag: `findLive` (prompt order = oldest started first) filtered by `isStale` (idle ≥ 6 h). Suggested end = `suggestedStaleEndTime` with Stats' `averageFrameTime` of the last frame's winner (the match's own average when nil). Cap = `averageMatchLength(pair, weekday of the start)`, else 3 h. `StaleMatchFlagged` is stored (not published) on every launch it is flagged; it is not an action, so the idle time keeps growing.
+- Resolve: `StaleChoice` (`resume`, `endAt(Date)`, `endCapped`, `abandon`, `cancel`) → `Match.resolveStale`. The cap is recomputed at resolve time. Refusals: `StaleMatchError.endTimeOutOfBounds`, `.noLongerStale` (played or ended since the flag), and `finishShortOfTarget` (ask, then `anyway`).
+- Tests: `StaleMatchesTests` (16): prompt order, the 6 h threshold, flag stored not published, 3 h fallback, the weekday cap, the suggested end (Stats and own average), each resolution, out-of-bounds end, short of target, no longer stale, and the queue.
+- The prompt and its wiring: spec 020.
