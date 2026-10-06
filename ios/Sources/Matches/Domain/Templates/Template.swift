@@ -35,11 +35,24 @@ public struct TemplateDeleted: Hashable, Sendable {
     public init(templateId: TemplateId) { self.templateId = templateId }
 }
 
+/// A player merge (S33) moved the folded-in player's reference to the kept player.
+public struct TemplatePlayerMoved: Hashable, Sendable {
+    public let templateId: TemplateId
+    public let from: PlayerId
+    public let to: PlayerId
+    public let setup: Setup
+
+    public init(templateId: TemplateId, from: PlayerId, to: PlayerId, setup: Setup) {
+        self.templateId = templateId; self.from = from; self.to = to; self.setup = setup
+    }
+}
+
 public enum TemplateEvent: Hashable, Sendable {
     case created(TemplateCreated)
     case used(TemplateUsed)
     case combined(TemplatesCombined)
     case deleted(TemplateDeleted)
+    case playerMoved(TemplatePlayerMoved)
 }
 
 public enum TemplateError: Error, Equatable, Sendable {
@@ -49,12 +62,16 @@ public enum TemplateError: Error, Equatable, Sendable {
     case differentSetup(TemplateId)
     /// A template cannot absorb itself.
     case sameTemplate(TemplateId)
+    /// The player being moved is not in this template.
+    case playerNotInTemplate(PlayerId)
+    /// Moving the player would leave them playing themselves (both players merged into one).
+    case wouldPlayThemselves(PlayerId)
 }
 
 public struct Template: Hashable, Sendable, Identifiable {
     public let id: TemplateId
     /// The template's identity: at most one active template per setup.
-    public let setup: Setup
+    public private(set) var setup: Setup
     public private(set) var useCount: UseCount
     public private(set) var isDeleted: Bool
     public private(set) var uncommittedEvents: [TemplateEvent]
@@ -103,6 +120,22 @@ public struct Template: Hashable, Sendable, Identifiable {
         absorbed.isDeleted = true
         absorbed.uncommittedEvents.append(.deleted(TemplateDeleted(templateId: other.id)))
         return .success((survivor, absorbed))
+    }
+
+    /// After a player merge (S33): the folded-in player `from` becomes the kept player `to`, keeping
+    /// the entry order and use count. The moved template may now equal another one: combine them.
+    public func movePlayer(from: PlayerId, to: PlayerId) -> Result<Template, TemplateError> {
+        guard !isDeleted else { return .failure(.deleted(id)) }
+        guard setup.players.contains(from) else { return .failure(.playerNotInTemplate(from)) }
+        let first = setup.first == from ? to : setup.first
+        let second = setup.second == from ? to : setup.second
+        guard case .success(let moved) = Setup.create(
+            first, second, game: setup.game, style: setup.style, breakRule: setup.breakRule)
+        else { return .failure(.wouldPlayThemselves(to)) }
+        var t = self
+        t.setup = moved
+        t.uncommittedEvents.append(.playerMoved(TemplatePlayerMoved(templateId: id, from: from, to: to, setup: moved)))
+        return .success(t)
     }
 
     public func delete() -> Result<Template, TemplateError> {

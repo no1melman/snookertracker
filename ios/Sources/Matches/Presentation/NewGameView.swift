@@ -9,6 +9,7 @@ import SwiftUI
 public struct NewGameView: View {
     let onStart: (MatchID) -> Void
     @Environment(\.matchesPorts) private var ports
+    @Environment(\.archivePlayer) private var archivePlayer
     @State private var selected: [PlayerRef] = []
     @State private var game = Game.pool
     @State private var style = MatchStyle.mostFramesWins
@@ -54,6 +55,14 @@ public struct NewGameView: View {
                         .frame(minHeight: 36)
                     }
                     .tint(.primary)
+                    .swipeActions {
+                        if let archivePlayer {
+                            // No confirmation: Unarchive reverses it (ADR-0008, S34).
+                            Button("Archive", systemImage: "archivebox") { archive(player.id, with: archivePlayer) }
+                                .labelStyle(.iconOnly)
+                                .tint(.orange)
+                        }
+                    }
                 }
                 HStack {
                     TextField("Add player", text: $newName)
@@ -144,6 +153,24 @@ public struct NewGameView: View {
         guard let commands = ports?.templateCommands else { return }
         attempt($error) { try commands.deleteTemplate(template.id) }
     }
+
+    /// The player drops out of the list (suggestions are active players); a refusal (in a live
+    /// match) explains itself.
+    private func archive(_ player: PlayerRef, with archivePlayer: ArchivePlayerAction) {
+        attempt($error) {
+            try archivePlayer(player)
+            selected.removeAll { $0 == player }
+        }
+    }
+}
+
+/// `ArchivePlayer` (S34, ADR-0008), supplied by the composition root because Matches can't import
+/// Players. Throws the refusal (e.g. the player is in a live match) as a `LocalizedError`.
+public typealias ArchivePlayerAction = @MainActor @Sendable (PlayerRef) throws -> Void
+
+public extension EnvironmentValues {
+    /// nil hides the swipe-to-archive action on New Game's player list.
+    @Entry var archivePlayer: ArchivePlayerAction? = nil
 }
 
 /// One recent setup: both players' plates, then the game, the style and targets as entered and the

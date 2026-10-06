@@ -46,12 +46,13 @@ The Players context's `Player` aggregate end to end: domain, repository, use cas
   - `PlayerSuggestions(prefix)`: id, name, colour; active players only, case-insensitive prefix
   - `PlayersList`: id, name, colour, status; active and archived sections
 - [x] All seven events are published as Stage 2 (consumed by Matches, Stats and the Me policies)
-- [ ] Matches-side policies:
-  - `MovePlayerMatches` on `PlayersMerged`: repoints the `PlayerId`, recorded as a correction event
-  - `DeleteMatch` on `PlayerRemoved`, for each of their matches
-  - `DeleteTemplate` on `PlayerRemoved`, for each of their templates
-  - `CombineTemplatesAfterMerge` on `PlayersMerged`
-  - `TemplateList` hides templates with an archived player (`PlayerArchived` / `PlayerUnarchived`)
+- [ ] Matches-side policies (`ios/Sources/Matches/Application/Policies`). All are built except `MovePlayerMatches`:
+  - `MovePlayerMatches` on `PlayersMerged`: repoints the `PlayerId`, recorded as a correction event. **Blocked:** `Match` has no behaviour or event that repoints a player, so the domain change comes first.
+  - [x] `DeleteMatch` on `PlayerRemoved`, for each of their matches (`DeleteMatchesOnPlayerRemoved`, via the `deleteMatch` use case; a live match is cancelled first)
+  - [x] `DeleteTemplate` on `PlayerRemoved`, for each of their templates (`DeleteTemplatesOnPlayerRemoved`)
+  - [x] `CombineTemplatesAfterMerge` on `PlayersMerged`. `Template.movePlayer` (`TemplatePlayerMoved`) repoints the template, and it then combines with an identical one if there is one. A template of the two merged players together is deleted.
+  - [x] `TemplateList` hides templates with an archived player (`PlayerArchived` / `PlayerUnarchived`). `HideArchivedPlayersTemplates` reacts to the events, and the composition root seeds the players archived at launch.
+  - [x] `PlayerMatchQueries` open host (`MatchesForPlayers`): `matchCount` and `havePlayedEachOther` count every match that isn't deleted, cancelled ones included
 
 ## UI (design language: 022)
 - [x] The **Players** screen, from `PlayersList`:

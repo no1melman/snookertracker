@@ -6,12 +6,15 @@ import Observation
 
 /// `TemplateList` read model (spec 008). Holds the stored rows (reloaded after every template
 /// change) and resolves names and colours from the Players supplier at read time, so a rename or
-/// recolour shows straight away. A template whose player the supplier no longer knows is left out.
+/// recolour shows straight away. A template whose player the supplier no longer knows is left out,
+/// and so is one with an archived player (S34), until they are unarchived (S35).
 @MainActor @Observable
 public final class TemplateListProjection: TemplateListQuery {
     private let reader: any TemplateListReader
     private let directory: any MatchPlayerDirectory
     private var entries: [TemplateListEntry] = []
+    /// Archived players: seeded at launch, then kept by `HideArchivedPlayersTemplates`.
+    private var archived: Set<PlayerRef> = []
 
     public init(reader: any TemplateListReader, players: any MatchPlayerDirectory) {
         self.reader = reader
@@ -22,10 +25,27 @@ public final class TemplateListProjection: TemplateListQuery {
         entries = try reader.templateList()
     }
 
+    /// The players archived at launch (the composition root reads them from Players).
+    public func seedArchived(_ players: some Sequence<PlayerRef>) {
+        archived = Set(players)
+    }
+
+    /// `PlayerArchived`: their templates are hidden.
+    public func hideTemplates(of player: PlayerRef) {
+        archived.insert(player)
+    }
+
+    /// `PlayerUnarchived` (or removed): their templates show again (removed ones are already gone).
+    public func showTemplates(of player: PlayerRef) {
+        archived.remove(player)
+    }
+
     public var templates: [TemplateRow] {
         entries.compactMap { entry in
-            guard let first = entry.setup.first.ref.flatMap(directory.player),
-                  let second = entry.setup.second.ref.flatMap(directory.player)
+            guard let firstRef = entry.setup.first.ref, let secondRef = entry.setup.second.ref,
+                  !archived.contains(firstRef), !archived.contains(secondRef),
+                  let first = directory.player(firstRef),
+                  let second = directory.player(secondRef)
             else { return nil }
             return TemplateRow(
                 id: entry.id, players: [first, second], game: Game(entry.setup.game),
@@ -92,7 +112,48 @@ public final class TemplateUseCases: TemplateCommands {
         }
     }
 
+    // MARK: Player reactions (spec 011)
+
+    /// `DeleteTemplate` for each template of a removed player (S42).
+    public func deleteTemplates(of player: PlayerRef) throws {
+        for template in try repository.findByPlayer(player) {
+            if case .success(let deleted) = template.delete() { try save(deleted) }
+        }
+        try list.reload()
+    }
+
+    /// `CombineTemplatesAfterMerge` (S33): each of the folded-in player's templates moves to the kept
+    /// player; one that now equals a kept template is absorbed by it (use counts add). A template of
+    /// the two of them together can't survive the merge (it would be a player against themselves),
+    /// so it is deleted.
+    public func combineTemplatesAfterMerge(kept: PlayerRef, foldedIn: PlayerRef) throws {
+        let from = PlayerId(ref: foldedIn), to = PlayerId(ref: kept)
+        for template in try repository.findByPlayer(foldedIn) {
+            switch template.movePlayer(from: from, to: to) {
+            case .success(let moved):
+                if let existing = try repository.findBySetup(moved.setup), existing.id != moved.id {
+                    switch existing.combine(with: moved) {
+                    case .success(let (survivor, absorbed)):
+                        try save(absorbed)
+                        try save(survivor)
+                    case .failure(let error): throw error
+                    }
+                } else {
+                    try save(moved)
+                }
+            case .failure(.wouldPlayThemselves):
+                if case .success(let deleted) = template.delete() { try save(deleted) }
+            case .failure(let error): throw error
+            }
+        }
+        try list.reload()
+    }
+
     // MARK: Plumbing
+
+    private func save(_ template: Template) throws {
+        try repository.save(template)
+    }
 
     /// save → refresh. Template events are Stage 1 only, so nothing is dispatched.
     private func commit(_ template: Template) throws {

@@ -48,14 +48,22 @@ public final class SQLiteTemplateRepository: TemplateRepository, TemplateListRea
             try db.execute("DELETE FROM templates WHERE template_id = ?", [template.id.value])
             return
         }
+        // Only a use (or creating / combining) counts as using it; a merge moving a player does not.
+        let used = template.uncommittedEvents.contains { event in
+            if case .playerMoved = event { return false }
+            return true
+        }
         do {
             try db.execute("""
                 INSERT INTO templates (template_id, setup_key, first_player, second_player, setup, use_count, last_used_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT (template_id) DO UPDATE SET use_count = excluded.use_count, last_used_at = excluded.last_used_at
+                ON CONFLICT (template_id) DO UPDATE SET
+                    setup_key = excluded.setup_key, first_player = excluded.first_player,
+                    second_player = excluded.second_player, setup = excluded.setup, use_count = excluded.use_count,
+                    last_used_at = CASE WHEN ? THEN excluded.last_used_at ELSE templates.last_used_at END
                 """,
                 [template.id.value, Self.key(template.setup), template.setup.first.value, template.setup.second.value,
-                 try JSONEncoder().encode(template.setup), template.useCount.value, now()])
+                 try JSONEncoder().encode(template.setup), template.useCount.value, now(), used])
         } catch let error as SQLiteError where error.isConstraintViolation {
             throw TemplateRepositoryError.setupAlreadyHasTemplate
         }

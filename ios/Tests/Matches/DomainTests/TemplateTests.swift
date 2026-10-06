@@ -67,6 +67,33 @@ struct TemplateTests {
         #expect(t.useCount == .one)
     }
 
+    @Test func movingAMergedPlayerRepointsTheSetupAndKeepsTheUseCount() {
+        let t = Template.restore(id: Self.id1, setup: Self.raceTo5(Fixture.stranger, Fixture.asher), useCount: UseCount.create(3).value!)
+        let moved = t.movePlayer(from: Fixture.stranger, to: Fixture.callum).value!
+        #expect(moved.setup.first == Fixture.callum)
+        #expect(moved.setup.second == Fixture.asher)
+        #expect(moved.setup == Self.raceTo5())
+        #expect(moved.useCount.value == 3)
+        #expect(moved.uncommittedEvents == [.playerMoved(TemplatePlayerMoved(
+            templateId: Self.id1, from: Fixture.stranger, to: Fixture.callum, setup: moved.setup))])
+    }
+
+    @Test func aMovedTemplateThatNowEqualsAnotherCombinesWithIt() {
+        let kept = Template.restore(id: Self.id1, setup: Self.raceTo5(), useCount: UseCount.create(2).value!)
+        let folded = Template.restore(id: Self.id2, setup: Self.raceTo5(Fixture.asher, Fixture.stranger), useCount: .one)
+        let moved = folded.movePlayer(from: Fixture.stranger, to: Fixture.callum).value!
+        let (survivor, absorbed) = kept.combine(with: moved).value!
+        #expect(survivor.useCount.value == 3)
+        #expect(absorbed.isDeleted)
+    }
+
+    @Test func aPlayerCanOnlyBeMovedWithinATemplateTheyAreInAndNeverOntoTheirOpponent() {
+        let t = Template.create(id: Self.id1, setup: Self.raceTo5())
+        #expect(t.movePlayer(from: Fixture.stranger, to: Fixture.callum).error == .playerNotInTemplate(Fixture.stranger))
+        #expect(t.movePlayer(from: Fixture.asher, to: Fixture.callum).error == .wouldPlayThemselves(Fixture.callum))
+        #expect(t.committed().delete().value!.movePlayer(from: Fixture.asher, to: Fixture.stranger).error == .deleted(Self.id1))
+    }
+
     @Test func aTemplateForAnotherSetupIsNeverUsedForThisOne() {
         let other = Template.create(id: Self.id1, setup: Fixture.setup())
         #expect(TemplateUse.record(Self.raceTo5(), existing: other, newId: Self.id2).error == .differentSetup(Self.id1))
