@@ -121,6 +121,7 @@ enum HubDestination: Hashable {
 /// Settings (specs 007, 012): inset grouped list of match defaults and Me.
 struct SettingsView: View {
     @Environment(\.playersPorts) private var players
+    @State private var replayingWalkthrough = false
 
     var body: some View {
         Form {
@@ -129,8 +130,10 @@ struct SettingsView: View {
                 NavigationLink(value: HubDestination.me) {
                     LabeledContent("Me", value: players?.list.me?.name ?? "Not set")
                 }
+                Button("Replay Walkthrough", systemImage: "play.rectangle.on.rectangle") { replayingWalkthrough = true }
             }
         }
         .navigationTitle("Settings")
+        .sheet(isPresented: $replayingWalkthrough) { WalkthroughView { replayingWalkthrough = false } }
     }
 }

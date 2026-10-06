@@ -26,11 +26,14 @@ Which player is "Me" on this device, and the first-launch welcome. Source: `docs
 - [x] `UpdateMeOnMerge`: policy on `PlayersMerged`; Me follows the kept player
 - [x] `ClearMeOnRemoval`: policy on `PlayerRemoved`
   - Both are `MePolicies` in `PlayersService.swift`, run on the domain events right after the save. Tests: `meFollowsTheKeptPlayerOnMerge`, `removalClearsMeAndPublishesPlayerRemoved`.
-- [ ] `WhoAmI` read model: id and name, displayed "Me (Callum)". Published to Stats.
-- [ ] `Welcome` on first launch: name entry (creates the player and sets Me), then a skippable, replayable walkthrough
+- [x] `WhoAmI` read model: id and name, displayed "Me (Callum)". Published to Stats.
+  - `WhoAmI` (`displayName` gives "Me (Callum)") and `PlayersListQuery.whoAmI` are in `ios/Sources/Players/Application/WhoAmI.swift`. Stats reads Me through the `me` closure on `StatsPorts`. Test: `whoAmIIsDisplayedAsMeAndName`.
+- [x] `Welcome` on first launch: name entry (creates the player and sets Me), then a skippable, replayable walkthrough
+  - `Welcome.player(named:)` adds the player. If an earlier welcome was interrupted, it takes the active player of that name instead. Me is set when the walkthrough is done or skipped, and that ends the full-screen welcome. Tests: `WelcomeIntegrationTests`.
 
 ## UI (design language: 022)
-- [ ] **Welcome:** a full-screen name entry on first launch, then a skippable walkthrough, which can be replayed from Settings
+- [x] **Welcome:** a full-screen name entry on first launch, then a skippable walkthrough, which can be replayed from Settings
+  - Settings → You → Replay Walkthrough presents `WalkthroughView` as a sheet.
 - [x] Me is shown as "Me (Callum)" on the hub and in Settings, and can be set or changed from either (`SetMe`)
 
 ## Non-goals
@@ -46,13 +49,9 @@ Which player is "Me" on this device, and the first-launch welcome. Source: `docs
   - The `MeSetting` value is in `ios/Sources/Players/Domain/MeSetting.swift`. `set` and `clear` raise nothing, and it has pure `followingMerge` and `clearingOnRemoval` functions, which domain tests cover.
   - `SQLiteMeSettingStore` stores a single row.
   - `PlayersService.setMe` is reachable from Welcome, from the hub's Me row (`MeView`) and from Settings.
-  - `AppRoot` shows `WelcomeView` full-screen until Me exists. Entering a name adds the player and sets Me.
+  - `AppRoot` shows `WelcomeView` full-screen until Me exists. Entering a name adds the player. Finishing or skipping the walkthrough then sets Me (2026-10-06).
   - Tests: `playersAndMeSurviveARelaunch` and `meMustBeAnExistingPlayer`.
 - **Decisions:**
   - SetMe accepts an active or archived player.
   - The hub and Settings show "Me" next to the player's plate or name rather than the literal "Me (Callum)".
-- **Remains:**
-  - Wire the `UpdateMeOnMerge` and `ClearMeOnRemoval` policies to `PlayersMerged` and `PlayerRemoved`. That needs the 011 merge and remove use cases.
-  - A `WhoAmI` read model published to Stats.
-  - The skippable, replayable walkthrough and its Settings row.
-  - Integration tests for following a merge, clearing on removal, and the welcome flow.
+- **Remains:** none. The Me policies are wired through 011 (`PlayersService`), with integration tests for merge, removal and the welcome flow.
