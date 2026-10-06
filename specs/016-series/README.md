@@ -23,19 +23,19 @@ transitions:
 **Also depends on** 014 (adds the series filter to `Stats(filter)`). Not in frontmatter: `leanspec rel` is not migrated yet.
 
 ## Requirements
-- [ ] Value objects: `SeriesId`, `SeriesName` (non-blank), `Setup` (as published in `MatchStarted`, conformist), `Month`
-- [ ] `Series.create(name, setups)` raises `SeriesCreated`
-- [ ] `change(name?, add:, remove:)` raises `SeriesChanged`
-- [ ] `delete()` raises `SeriesDeleted`; it never touches matches
-- [ ] A setup can be in several series
-- [ ] `SeriesRepository`: `getById`, `save`, `findAll`, `findContainingPlayer`
-- [ ] Use cases: `CreateSeries`, `ChangeSeries`, `DeleteSeries`
-- [ ] Policies: `RepointSeriesOnMerge` (`PlayersMerged`) and `RemovePlayerFromSeries` (`PlayerRemoved`)
-- [ ] `SeriesList` read model: id, name, setups
-- [ ] The series filter in `Stats(filter)` resolves membership by setup
+- [x] Value objects: `SeriesId`, `SeriesName` (non-blank), `Setup` (as published in `MatchStarted`, conformist), `Month`
+- [x] `Series.create(name, setups)` raises `SeriesCreated`
+- [x] `change(name?, add:, remove:)` raises `SeriesChanged`
+- [x] `delete()` raises `SeriesDeleted`; it never touches matches
+- [x] A setup can be in several series
+- [x] `SeriesRepository`: `getById`, `save`, `findAll`, `findContainingPlayer`
+- [x] Use cases: `CreateSeries`, `ChangeSeries`, `DeleteSeries`
+- [x] Policies: `RepointSeriesOnMerge` (`PlayersMerged`) and `RemovePlayerFromSeries` (`PlayerRemoved`)
+- [x] `SeriesList` read model: id, name, setups
+- [ ] The series filter in `Stats(filter)` resolves membership by setup. The helper is ready: `SeriesMembership.filter(for:)` gives a `SeriesFilter`, and its `contains(record, resolve:)` says whether a match belongs. Plugging it into `Stats(filter)` is 014's job.
 
 ## UI (design language: 022)
-- [ ] The **Series** screen, from `SeriesList`:
+- [x] The **Series** screen, from `SeriesList`:
   - Create and edit in a sheet (name, choose setups)
   - Delete by swiping a series row (icon-only action), with a confirmation stating that the matches are kept
 - [ ] The series filter appears in Stats (014)
@@ -48,3 +48,17 @@ transitions:
 - Integration tests: membership by setup (past and future matches), several series per setup, the merge and removal policies
 
 **Implementation skills:** `ddd-tactical-patterns`, `ddd-repositories`, `ddd-application-layer`, `ddd-cqrs` · **Tests:** `ddd-testing`
+
+## Progress
+- **Code:** `ios/Sources/Stats/{Domain,Application,Infrastructure,Presentation}/Series/`. Tests are in `ios/Tests/Stats/{DomainTests,IntegrationTests}/Series/` (15 domain, 7 integration).
+- **Persistence:** its own tables, `series` and `series_setups` (migration `stats.series.001`), through `SQLiteSeriesRepository`. The same adapter is also the `SeriesListReader`.
+- **Screen:** `SeriesView` reads `@Environment(\.seriesPorts)`. Swipe → Delete is icon-only (ADR-0008), and the confirmation says the matches are kept.
+- **Left:** the series filter in Stats (014), the monthly summary (separate spec), and composition-root wiring.
+
+## Decisions
+- `Setup` is Stats' own copy of the `MatchStarted` setup shape (conformist). Its equality matches Matches': players unordered, targets compared by race-to value. `Setup.key` is the text identity used in storage.
+- Membership is never stored per match. It is worked out at read time from the record's setup, following merges (`SeriesFilter.followingMerges`), because Stats' records keep the original player ids.
+- "One or more setups" is checked on create, and in `ChangeSeries` when the sheet saves. Policies may still empty a series (its last player removed). The series is kept so the scorer can edit or delete it.
+- A change that changes nothing raises no `SeriesChanged`, so the policies are idempotent.
+- Series events are Stage 1 only, so nothing is dispatched.
+- The sheet offers setups from the `SeriesSetupCatalog` port. `StatsStoreSetupCatalog` adapts it over the Stats store: recorded matches and players, with removed players left out.
