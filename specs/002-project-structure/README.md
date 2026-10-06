@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-10-05
 priority: high
 tags:
@@ -7,10 +7,13 @@ tags:
 - infrastructure
 parent: '1'
 created_at: 2026-10-05T10:42:31.444768Z
-updated_at: 2026-10-05T19:18:16.517579Z
+updated_at: 2026-10-06T20:13:14.488902Z
+completed_at: 2026-10-06T20:13:14.488902Z
 transitions:
 - status: in-progress
   at: 2026-10-05T19:18:16.517579Z
+- status: complete
+  at: 2026-10-06T20:13:14.488902Z
 ---
 
 # Project structure & layering
@@ -26,8 +29,8 @@ Set up the Swift module layout that every other spec builds into, and enforce th
   - Matches→Players: OHS (`IsPlayerInLiveMatch`, `HavePlayedEachOther`)
   - Matches→Stats and Players→Stats: published language, conformist
   - Stats→Matches: OHS (`HeadToHead`, `AverageFrameTime`, `AverageMatchLength`)
-- [ ] An iOS anti-corruption layer lives in infrastructure (adapters for UserNotifications, ActivityKit + App Intents, app lifecycle)
-  - Partial: lifecycle (`AppLifecycle`) and ActivityKit (`ActivityKitLockScreenPresenter`) adapters exist in `iOSAdapters`, and the App Intents live in the widget target. There is no UserNotifications adapter yet.
+- [x] An iOS anti-corruption layer lives in infrastructure (adapters for UserNotifications, ActivityKit + App Intents, app lifecycle)
+  - UserNotifications (`UserNotificationsScheduler`), ActivityKit + App Intents and lifecycle adapters all live in `Shared/iOSAdapters`.
 - [x] An in-process event dispatcher: after save, Stage 2 events reach their subscribers. Published event types are versioned.
 - [x] An iOS app target that composes the modules (composition root)
 - [x] `swift build` and `swift test` run green in CI or locally

@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-10-05
 priority: high
 tags:
@@ -10,10 +10,13 @@ depends_on:
 - '11'
 parent: '1'
 created_at: 2026-10-05T10:42:31.495503Z
-updated_at: 2026-10-05T20:46:00.685596Z
+updated_at: 2026-10-06T20:12:53.666751Z
+completed_at: 2026-10-06T20:12:53.666751Z
 transitions:
 - status: in-progress
   at: 2026-10-05T20:46:00.685596Z
+- status: complete
+  at: 2026-10-06T20:12:53.666751Z
 ---
 
 # Stats match records & history

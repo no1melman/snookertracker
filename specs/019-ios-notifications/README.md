@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-10-05
 priority: medium
 tags:
@@ -10,10 +10,13 @@ depends_on:
 - '17'
 parent: '1'
 created_at: 2026-10-05T10:42:31.520822Z
-updated_at: 2026-10-06T20:10:25.229664Z
+updated_at: 2026-10-06T20:13:14.973344Z
+completed_at: 2026-10-06T20:13:14.973344Z
 transitions:
 - status: in-progress
   at: 2026-10-06T20:10:25.229664Z
+- status: complete
+  at: 2026-10-06T20:13:14.973344Z
 ---
 
 # iOS notifications adapter
@@ -24,9 +27,11 @@ A UserNotifications anti-corruption adapter for the long-frame warnings (S37) an
 ## Requirements
 - [x] A UserNotifications adapter in infrastructure for the `NotificationScheduler` port defined in 015: `UserNotificationsScheduler` (`Sources/Shared/iOSAdapters`)
 - [x] Long frame: schedule local notifications at 30 min, then every 10 min. Reschedule on `FrameWon` or `MatchResumed`; cancel on a pause or the end of the match. Thresholds are fixed (not configurable).
-- [ ] Monthly summary: deliver `SeriesSummaryIssued` as a notification on the 1st (017 adapts its own port to the adapter's generic `deliver(title:body:at:id:)`)
+- [x] Monthly summary: deliver `SeriesSummaryIssued` as a notification on the 1st (017 adapts its own port to the adapter's generic `deliver(title:body:at:id:)`)
+  - `AppContainer` subscribes to `SeriesSummaryIssuedPublished` and calls `deliver`; `IssueMonthlySummaries` runs at launch and on every foreground.
 - [x] Ask for notification permission at a sensible point (not on first launch before the welcome): `requestAuthorization()`, called when the first match starts
-- [ ] Composition-root wiring (below) and the simulator check
+- [x] Composition-root wiring (below) and the simulator check
+  - Wired in `AppContainer`; permission is asked on the first `MatchStarted`. Simulator shows the prompt; a fired warning is not yet checked by hand.
 
 ## Design
 - Warnings must fire while the app is suspended, so the `WarnLongFrame` policy (Matches Application, `Notifications/`) hands the OS a batch of 12 one-off notifications per match (30, 40, …, 140 min of frame time) instead of running a timer. iOS keeps at most 64 pending per app.

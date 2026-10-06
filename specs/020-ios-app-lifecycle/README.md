@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-10-05
 priority: medium
 tags:
@@ -9,10 +9,13 @@ depends_on:
 - '15'
 parent: '1'
 created_at: 2026-10-05T10:42:31.524838Z
-updated_at: 2026-10-05T20:46:01.144353Z
+updated_at: 2026-10-06T20:13:15.193875Z
+completed_at: 2026-10-06T20:13:15.193875Z
 transitions:
 - status: in-progress
   at: 2026-10-05T20:46:01.144353Z
+- status: complete
+  at: 2026-10-06T20:13:15.193875Z
 ---
 
 # iOS app lifecycle adapter
@@ -25,13 +28,13 @@ An app lifecycle anti-corruption adapter: auto-pause after the app is killed (S2
 - [x] Record the time the app goes to the background; clear it on every return to the foreground
 - [x] On launch, detect that the last session was killed (it never returned to the foreground cleanly). iOS gives no reliable termination signal for a suspended app, so detection happens here, not in `willTerminate`.
 - [x] After a kill, invoke `AutoPauseLiveMatches` with the recorded background time (or none). The use case pauses each match at the later of that time and its last action.
-- [ ] Then invoke `FlagStaleMatches` and present the stale prompt one match at a time, sending the choice to `ResolveStaleMatch`
-  - Partial: the use cases, the queue and the prompt are built; the `afterAutoPause` step and the `.stalePrompt` call in the composition root are not wired yet.
+- [x] Then invoke `FlagStaleMatches` and present the stale prompt one match at a time, sending the choice to `ResolveStaleMatch`
+  - `AppLaunchSequence` `afterAutoPause` calls `StaleMatchQueue.flag()`.
 - [x] No lifecycle types leak into the application or domain layers
 
 ## UI (design language: 022)
-- [ ] The **stale prompt** is a system alert or sheet, one match at a time:
-  - Partial: built as `.stalePrompt(queue)` (`Matches/Presentation/StalePrompt.swift`), not yet attached in `AppRoot`.
+- [x] The **stale prompt** is a system alert or sheet, one match at a time:
+  - `.stalePrompt(...)` on the hub in `AppRoot`, hidden while Welcome shows.
   - It shows the players, the score and how long the match has been idle
   - Its options are the choices `ResolveStaleMatch` offers
 

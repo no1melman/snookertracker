@@ -28,10 +28,10 @@ Matches query side: live-match views and the open-host queries that Players call
   - Head-to-head from Stats' `HeadToHead` OHS (inject the protocol, so it can be stubbed until Stats lands)
   - Done (2026-10-06): `LiveSide.sets` and `LiveMatchScreen.scoreText` ("(1) 5 – 2 (0)"), `setWon` (Continue? prompt), `coloursClash` (S46), `controls.correctBreaker`. Head-to-head is `LiveHeadToHead.lookup(any MatchStatsQueries)`, handed to the view as `MatchesPorts.headToHead`.
 - [x] `LockScreenState`: the oldest live match (as `findLive`), or none: match id, sides, score, breaker, frame timer, paused (Q4 noted). Moves to the next-oldest when the shown match ends (ADR-0004).
-- [ ] OHS `IsPlayerInLiveMatch(PlayerId)`: used by Players' archive guard and the "are you sure" check on start
-  - Partial: the protocol `PlayerMatchQueries.isPlayerInLiveMatch` is published in `MatchesPublished`, but nothing implements, wires or tests it yet.
-- [ ] OHS `HavePlayedEachOther(PlayerId, PlayerId)`: used by Players' merge guard
-  - Partial: the protocol `PlayerMatchQueries.havePlayedEachOther` is published, but nothing implements, wires or tests it yet.
+- [x] OHS `IsPlayerInLiveMatch(PlayerId)`: used by Players' archive guard and the "are you sure" check on start
+  - `MatchesForPlayers` implements `PlayerMatchQueries`, handed to `PlayersService` in `AppContainer`.
+- [x] OHS `HavePlayedEachOther(PlayerId, PlayerId)`: used by Players' merge guard
+  - `MatchesForPlayers`, wired in `AppContainer`; follows merges via `MatchPlayerMoved` (ADR-0009).
 - [x] Projections are kept current from the match event stream
 
 ## UI (design language: 022)

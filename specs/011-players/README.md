@@ -60,7 +60,8 @@ The Players context's `Player` aggregate end to end: domain, repository, use cas
   - Add from the toolbar
   - Context actions: Rename, Colour (from the fixed palette, still an open decision in 022), Merge into…, Archive or Unarchive, and Remove (archived only)
   - Swipe (icon-only, ADR-0008): an active row → Archive, with no confirmation. An archived row → Remove, which asks first only when the player has matches and says how many will be deleted; with none, the player is removed at once.
-- [ ] The **New Game** player list: swipe an active player → Archive (ADR-0008)
+- [x] The **New Game** player list: swipe an active player → Archive (ADR-0008)
+  - `NewGameView` swipe → `archivePlayer` environment action, wired in `AppRoot`.
 - [x] **Refusals** explain themselves:
   - Adding an archived name offers Remove
   - A merge is refused when the two have played each other

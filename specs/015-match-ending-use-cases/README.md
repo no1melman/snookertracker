@@ -26,7 +26,8 @@ Command-side use cases for ending, maintaining and cleaning up matches. Source: 
 - [x] `FinishMatch` (menu + confirmation, or the Finish prompt): an early finish of a target style returns "will be abandoned" unless `anyway`
 - [x] `AbandonMatch` and `CancelMatch`, with confirmation
 - [x] `FinishAllMatches`: finishable matches are finished, the others abandoned; one dialog if any will be abandoned
-- [ ] `AutoPauseLiveMatches` (launch, after a kill; ADR-0004, ADR-0005):
+- [x] `AutoPauseLiveMatches` (launch, after a kill; ADR-0004, ADR-0005):
+  - Built in round 1 (`AutoPauseLiveMatches.swift`, `AutoPauseLiveMatchesTests`), run by `AppLaunchSequence`.
   - Input: the last background time, if recorded
   - `findLive` → `autoPause(at:)` each running match, `at` = the later of the background time and that match's last action (the last action when none was recorded)
   - Already-paused matches untouched; runs before `FlagStaleMatches`

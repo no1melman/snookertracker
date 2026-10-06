@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 created: 2026-10-05
 priority: high
 tags:
@@ -10,10 +10,13 @@ depends_on:
 - '12'
 parent: '1'
 created_at: 2026-10-05T10:42:31.499454Z
-updated_at: 2026-10-06T19:45:19.278089Z
+updated_at: 2026-10-06T20:13:14.754219Z
+completed_at: 2026-10-06T20:13:14.754219Z
 transitions:
 - status: in-progress
   at: 2026-10-06T19:45:19.278089Z
+- status: complete
+  at: 2026-10-06T20:13:14.754219Z
 ---
 
 # Stats: deciders, filtered stats & open-host queries
@@ -45,7 +48,8 @@ Stats computations: the decider rules, filtered stats, head-to-head, and the ave
   - Grouping by opponent and/or weekday
   - Figures in monospaced digits: W–D–L, frames, deciders, match and set deciders, win %, and average frame time
   - One rivalry in focus, with the rest listed below it as context
-- [ ] The live screen's head-to-head strip (009) reads `HeadToHead`
+- [x] The live screen's head-to-head strip (009) reads `HeadToHead`
+  - `LiveHeadToHead.lookup(matchRecords)` passed in `MatchesPorts`.
 
 ## Non-goals
 - Outlier-excluding stats (out of scope, per decisions.md)

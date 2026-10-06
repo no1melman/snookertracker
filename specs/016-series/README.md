@@ -32,7 +32,8 @@ transitions:
 - [x] Use cases: `CreateSeries`, `ChangeSeries`, `DeleteSeries`
 - [x] Policies: `RepointSeriesOnMerge` (`PlayersMerged`) and `RemovePlayerFromSeries` (`PlayerRemoved`)
 - [x] `SeriesList` read model: id, name, setups
-- [ ] The series filter in `Stats(filter)` resolves membership by setup. The helper is ready: `SeriesMembership.filter(for:)` gives a `SeriesFilter`, and its `contains(record, resolve:)` says whether a match belongs. Plugging it into `Stats(filter)` is 014's job.
+- [x] The series filter in `Stats(filter)` resolves membership by setup. The helper is ready: `SeriesMembership.filter(for:)` gives a `SeriesFilter`, and its `contains(record, resolve:)` says whether a match belongs. Plugging it into `Stats(filter)` is 014's job.
+  - `StatsFilter.series: SeriesFilter?` (014) resolves membership by setup.
 
 ## UI (design language: 022)
 - [x] The **Series** screen, from `SeriesList`:

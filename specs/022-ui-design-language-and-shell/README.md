@@ -37,13 +37,13 @@ This spec sets the design language and navigation shell for the SwiftUI presenta
 ## Requirements
 This spec owns the design language, the hub shell and the Settings container. Each screen's requirements live in the spec that owns its read model or use case, in that spec's "UI (design language: 022)" section.
 
-- [ ] **Hub** (the root of one `NavigationStack`, with a large title and no tab bar):
-  - Partial: one NavigationStack, large title, New Game first, the Live section and the rows (including Me) are built. Missing: Finish all in the Live section (015). History, Stats and Series open placeholders.
+- [x] **Hub** (the root of one `NavigationStack`, with a large title and no tab bar):
+  - Finish all is in the Live section; History, Stats and Series are real screens.
   - **New Game** is the prominent first row
   - The **Live** section shows only when matches are live (009), with Finish all (015)
   - Then rows for History, Stats, Series, Players and Settings, and "Me (name)" (012)
-- [ ] **Settings** (an inset grouped list) contains the match defaults and live-match limit (007), Me and Replay walkthrough (012)
-  - Partial: match defaults, live-match limit and Me are built. Missing: Replay walkthrough (012).
+- [x] **Settings** (an inset grouped list) contains the match defaults and live-match limit (007), Me and Replay walkthrough (012)
+  - Settings → You → Replay Walkthrough.
 - [ ] A shared **player plate** component (colour plate plus name) used on every screen; archived players are greyed
   - Partial: `PlayerPlate` (archived greyed) is used on the hub, Players, New Game, History, match detail and the live-matches rows. The live screen still draws its own capsule bar instead.
 - [x] A shared **score numeral** style: monospaced digits that scale with Dynamic Type
