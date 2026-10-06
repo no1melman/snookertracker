@@ -155,6 +155,17 @@ public struct MatchRecord: Codable, Hashable, Sendable, Identifiable {
             status = .finished
             result = m.result.value
             markedFinishedAt = m.at
+        case .playerMoved(let from, let to):
+            // Merge resolution maps `from` to `to` anyway; repointing keeps later events (which name
+            // `to`) on the right side.
+            let repoint = { (id: UUID) in id == from ? to : id }
+            first = Side(player: repoint(first.player), colour: first.colour)
+            second = Side(player: repoint(second.player), colour: second.colour)
+            frames = frames.map {
+                Frame(number: $0.number, setNumber: $0.setNumber, winner: repoint($0.winner),
+                      length: $0.length, breaker: $0.breaker.map(repoint), at: $0.at)
+            }
+            if case .win(let w) = result { result = .win(repoint(w)) }
         }
     }
 

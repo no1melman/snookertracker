@@ -20,6 +20,9 @@ enum MatchFact {
     case scoreCorrected(ScoreCorrected)
     case markedFinished(MarkedFinished)
     case deleted
+    /// A merge repointed the match (ADR-0009). Applied, not left to merge resolution: events after
+    /// it (frames, a result) name the kept player, so the record must too.
+    case playerMoved(from: UUID, to: UUID)
     case ignored
 
     struct Side: Decodable { let player: UUID; let colour: String }
@@ -119,6 +122,7 @@ enum MatchFact {
     private struct At: Decodable { let at: Date }
     private struct FrameRemovedPayload: Decodable { let frameNumber: Int }
     private struct ColourOverridden: Decodable { let player: UUID; let colour: String }
+    private struct PlayerMoved: Decodable { let from: UUID; let to: UUID }
 
     /// Decodes one published event. Unknown types are ignored; unknown schema versions throw.
     static func decode(_ e: MatchEventPublished) throws -> MatchFact {
@@ -139,6 +143,9 @@ enum MatchFact {
         case "MatchScoreCorrected": return .scoreCorrected(try json.decode(ScoreCorrected.self, from: p))
         case "MatchMarkedFinished": return .markedFinished(try json.decode(MarkedFinished.self, from: p))
         case "MatchDeleted": return .deleted
+        case "MatchPlayerMoved":
+            let m = try json.decode(PlayerMoved.self, from: p)
+            return .playerMoved(from: m.from, to: m.to)
         default: return .ignored
         }
     }

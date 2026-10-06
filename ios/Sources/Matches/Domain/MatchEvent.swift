@@ -206,6 +206,17 @@ public struct MatchDeleted: Hashable, Sendable, Codable {
     public init(at: Date) { self.at = at }
 }
 
+/// A player merge (S33, ADR-0009) moved the folded-in player `from` to the kept player `to`. A
+/// correction of who played, not a play action: it doesn't reset the idle time, and the side keeps
+/// this match's colour.
+public struct MatchPlayerMoved: Hashable, Sendable, Codable {
+    public let from: PlayerId
+    public let to: PlayerId
+    public let at: Date
+
+    public init(from: PlayerId, to: PlayerId, at: Date) { self.from = from; self.to = to; self.at = at }
+}
+
 public enum MatchEvent: Hashable, Sendable, Codable {
     case matchStarted(MatchStarted)
     case breakerChosen(BreakerChosen)
@@ -226,6 +237,7 @@ public enum MatchEvent: Hashable, Sendable, Codable {
     case matchScoreCorrected(MatchScoreCorrected)
     case matchMarkedFinished(MatchMarkedFinished)
     case matchDeleted(MatchDeleted)
+    case matchPlayerMoved(MatchPlayerMoved)
 
     public var at: Date {
         switch self {
@@ -248,6 +260,7 @@ public enum MatchEvent: Hashable, Sendable, Codable {
         case .matchScoreCorrected(let e): e.at
         case .matchMarkedFinished(let e): e.at
         case .matchDeleted(let e): e.at
+        case .matchPlayerMoved(let e): e.at
         }
     }
 }

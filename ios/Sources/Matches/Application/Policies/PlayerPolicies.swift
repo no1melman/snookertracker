@@ -79,6 +79,39 @@ public final class DeleteMatchesOnPlayerRemoved {
     }
 }
 
+/// `MovePlayerMatches` on `PlayersMerged` (S33, ADR-0009): each of the folded-in player's matches is
+/// repointed to the kept player (`Match.movePlayer`, raising `MatchPlayerMoved`), then saved, published
+/// and projected like any other match change (`MatchUseCases.commit`). Live matches move too, so the
+/// live screen shows the kept player. A deleted match is left as it is, and so is one the two played
+/// together (the merge guard refuses that merge, so it can only come from a race).
+@MainActor
+public final class MovePlayerMatches {
+    private let matches: MatchUseCases
+    private let now: @Sendable () -> Date
+
+    /// `now`: the same clock as `matches`.
+    public init(matches: MatchUseCases, now: @escaping @Sendable () -> Date = Date.init) {
+        self.matches = matches
+        self.now = now
+    }
+
+    public func subscribe(to dispatcher: EventDispatcher) {
+        dispatcher.onPlayerReaction { [weak self] reaction in
+            guard case .merged(let kept, let foldedIn) = reaction else { return }
+            self?.moveMatches(from: foldedIn, to: kept)
+        }
+    }
+
+    public func moveMatches(from foldedIn: PlayerRef, to kept: PlayerRef) {
+        guard let found = try? matches.repository.findByPlayer(foldedIn) else { return }
+        let (from, to) = (PlayerId(ref: foldedIn), PlayerId(ref: kept))
+        for match in found {
+            guard case .success(let moved) = match.movePlayer(from: from, to: to, at: now()) else { continue }
+            try? matches.commit(moved)
+        }
+    }
+}
+
 /// `DeleteTemplate` on `PlayerRemoved` (S42): each of the removed player's templates goes.
 @MainActor
 public final class DeleteTemplatesOnPlayerRemoved {

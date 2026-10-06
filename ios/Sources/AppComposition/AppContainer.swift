@@ -103,11 +103,13 @@ final class AppContainer {
         let deleteTemplates = DeleteTemplatesOnPlayerRemoved(templates: templateCommands)
         let combineTemplates = CombineTemplatesAfterMerge(templates: templateCommands)
         let hideArchived = HideArchivedPlayersTemplates(list: templateList)
+        let movePlayerMatches = MovePlayerMatches(matches: matchCommands)
         deleteMatches.subscribe(to: dispatcher)
         deleteTemplates.subscribe(to: dispatcher)
         combineTemplates.subscribe(to: dispatcher)
+        movePlayerMatches.subscribe(to: dispatcher)
         hideArchived.subscribe(to: dispatcher)
-        playerPolicies = [deleteMatches, deleteTemplates, combineTemplates, hideArchived]
+        playerPolicies = [deleteMatches, deleteTemplates, combineTemplates, movePlayerMatches, hideArchived]
         templateList.seedArchived(players.players.filter(\.isArchived).map(\.id))
         players.matchQueries = MatchesForPlayers(matches: matchCommands)
         // S27 before anything reads live matches; then the stale check (S28) once Stats exists.

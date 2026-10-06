@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline), ADR-0009 (matches move with `MatchPlayerMoved`)
 **Actor:** Scorer
 **Trigger / interface:** Settings → Players → merge: pick the player to keep and the one to fold in
 **Description:** For two records of the same person ("Cal" and "Callum"). Every match, template and series setup of the folded-in player moves to the kept one; the folded-in player is gone.
@@ -28,9 +28,11 @@
 
 ## Domain Events Raised
 - `PlayersMerged` — kept, folded in
+- `MatchPlayerMoved` — from (folded in), to (kept); one per moved match, live ones included (ADR-0009)
+- `TemplatePlayerMoved` — from, to, the moved setup; one per moved template (not published)
 
 ## Reactions
-- when `PlayersMerged` → combine identical templates (`TemplatesCombined`); repoint series setups (`SeriesChanged`); Me follows the kept player
+- when `PlayersMerged` → move each of the folded-in player's matches (`MatchPlayerMoved`); move templates (`TemplatePlayerMoved`) and combine identical ones (`TemplatesCombined`); repoint series setups (`SeriesChanged`); Me follows the kept player
 
 ## Aggregates Touched
 - `Player`, `Match`, `Template`, `Series`, `Preferences`
@@ -43,12 +45,15 @@
 sequenceDiagram
   actor S as Scorer
   participant P as Player
+  participant M as Match
   participant T as Template
   participant Se as Series
   S->>P: MergePlayers(keep, fold)
   P-->>P: PlayersMerged
+  P-->>M: PlayersMerged → MovePlayer (each match)
+  M-->>M: MatchPlayerMoved
   P-->>T: PlayersMerged → CombineTemplates
-  T-->>T: TemplatesCombined
+  T-->>T: TemplatePlayerMoved, TemplatesCombined
   P-->>Se: PlayersMerged → ChangeSeries
   Se-->>Se: SeriesChanged
 ```

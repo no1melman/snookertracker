@@ -19,6 +19,7 @@ public enum MatchAction: String, Hashable, Sendable, Codable, CaseIterable {
     case correctScore
     case markFinished
     case delete
+    case movePlayer
 }
 
 public enum MatchError: Error, Equatable, Sendable {
@@ -73,7 +74,8 @@ public struct Pause: Hashable, Sendable, Codable {
 /// `applying(_:)`, so `Match.rehydrate(history)` rebuilds exactly the same match.
 public struct Match: Hashable, Sendable, Identifiable {
     public let id: MatchId
-    public let setup: Setup
+    /// As started; only a player merge (`MatchPlayerMoved`) changes who is in it.
+    public private(set) var setup: Setup
     public let startTime: StartTime
     public private(set) var first: Side
     public private(set) var second: Side
@@ -226,7 +228,31 @@ public struct Match: Hashable, Sendable, Identifiable {
             m.status = .finished
         case .matchDeleted:
             m.status = .deleted
+        case .matchPlayerMoved(let e):
+            m = movingPlayer(from: e.from, to: e.to)
         }
+        return m
+    }
+
+    /// Every reference to `from` (setup, sides, frames, breaker origin, result) becomes `to`.
+    /// Total: an event that doesn't fit the match leaves it as it is.
+    private func movingPlayer(from: PlayerId, to: PlayerId) -> Match {
+        let repoint = { (id: PlayerId) in id == from ? to : id }
+        let move = { (side: Side) in Side(player: repoint(side.player), colour: side.colour) }
+        guard case .success(let moved) = Setup.create(
+            repoint(setup.first), repoint(setup.second),
+            game: setup.game, style: setup.style, breakRule: setup.breakRule)
+        else { return self }
+        var m = self
+        m.setup = moved
+        m.first = move(first)
+        m.second = move(second)
+        m.frames = frames.map {
+            Frame(winner: move($0.winner), number: $0.number, setNumber: $0.setNumber,
+                  length: $0.length, breaker: $0.breaker.map(move), wonAt: $0.wonAt)
+        }
+        m.breakerOrigin = breakerOrigin.map { BreakerOrigin(player: repoint($0.player), frameNumber: $0.frameNumber) }
+        if case .win(let side) = result { m.result = .win(move(side)) }
         return m
     }
 
@@ -429,6 +455,17 @@ public struct Match: Hashable, Sendable, Identifiable {
         return .success(raising([.matchDeleted(MatchDeleted(at: at))]))
     }
 
+    /// After a player merge (S33, ADR-0009): the folded-in player `from` becomes the kept player `to`
+    /// everywhere in the match. A correction, not play: allowed in every status but deleted (live
+    /// included), the side keeps this match's colour and the idle time is not reset. Refused when `to`
+    /// is already in the match, since they would play themselves.
+    public func movePlayer(from: PlayerId, to: PlayerId, at: Date) -> Result<Match, MatchError> {
+        guard status != .deleted else { return .failure(.notAllowed(.movePlayer, status: status)) }
+        guard side(of: from) != nil else { return .failure(.playerNotInMatch(from)) }
+        guard side(of: to) == nil else { return .failure(.notAllowed(.movePlayer, status: status)) }
+        return .success(raising([.matchPlayerMoved(MatchPlayerMoved(from: from, to: to, at: at))]))
+    }
+
     /// `endedAt`: an explicit end (stale match); nil to end at `at`, or at the winning frame from
     /// AwaitingConfirmation. `cappedLength`: only ever passed by `resolveStale`.
     private func finishing(at: Date, anyway: Bool, endedAt explicitEnd: Date?, cappedLength: CappedLength?) -> Result<Match, MatchError> {
@@ -611,10 +648,10 @@ public struct Match: Hashable, Sendable, Identifiable {
 
 extension MatchEvent {
     /// A recorded action (score change, breaker choice, pause/resume, ending, …) that resets the idle time.
-    /// Warnings and stale flags are not actions.
+    /// Warnings, stale flags and a merge's player move are not actions.
     var isAction: Bool {
         switch self {
-        case .staleMatchFlagged, .longFrameWarned: false
+        case .staleMatchFlagged, .longFrameWarned, .matchPlayerMoved: false
         default: true
         }
     }

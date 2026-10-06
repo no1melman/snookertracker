@@ -41,6 +41,7 @@ public enum MatchEventWire {
         case .matchScoreCorrected(let e): ("MatchScoreCorrected", try encoder.encode(e))
         case .matchMarkedFinished(let e): ("MatchMarkedFinished", try encoder.encode(e))
         case .matchDeleted(let e): ("MatchDeleted", try encoder.encode(e))
+        case .matchPlayerMoved(let e): ("MatchPlayerMoved", try encoder.encode(e))
         }
         return Encoded(type: type, schemaVersion: currentSchemaVersion, payload: payload)
     }
@@ -73,6 +74,7 @@ public enum MatchEventWire {
         case "MatchScoreCorrected": return .matchScoreCorrected(try decoder.decode(MatchScoreCorrected.self, from: payload))
         case "MatchMarkedFinished": return .matchMarkedFinished(try decoder.decode(MatchMarkedFinished.self, from: payload))
         case "MatchDeleted": return .matchDeleted(try decoder.decode(MatchDeleted.self, from: payload))
+        case "MatchPlayerMoved": return .matchPlayerMoved(try decoder.decode(MatchPlayerMoved.self, from: payload))
         default: throw WireError.unknownType(type, schemaVersion: schemaVersion)
         }
     }

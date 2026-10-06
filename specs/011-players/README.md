@@ -46,8 +46,8 @@ The Players context's `Player` aggregate end to end: domain, repository, use cas
   - `PlayerSuggestions(prefix)`: id, name, colour; active players only, case-insensitive prefix
   - `PlayersList`: id, name, colour, status; active and archived sections
 - [x] All seven events are published as Stage 2 (consumed by Matches, Stats and the Me policies)
-- [ ] Matches-side policies (`ios/Sources/Matches/Application/Policies`). All are built except `MovePlayerMatches`:
-  - `MovePlayerMatches` on `PlayersMerged`: repoints the `PlayerId`, recorded as a correction event. **Blocked:** `Match` has no behaviour or event that repoints a player, so the domain change comes first.
+- [x] Matches-side policies (`ios/Sources/Matches/Application/Policies`):
+  - [x] `MovePlayerMatches` on `PlayersMerged` (ADR-0009). Each of the folded-in player's matches that isn't deleted, live ones included, gets `Match.movePlayer`, which raises the Stage 2 correction `MatchPlayerMoved`. The match is saved and published through `MatchUseCases.commit`. Stats repoints its record. It's subscribed in `AppContainer` next to `CombineTemplatesAfterMerge`.
   - [x] `DeleteMatch` on `PlayerRemoved`, for each of their matches (`DeleteMatchesOnPlayerRemoved`, via the `deleteMatch` use case; a live match is cancelled first)
   - [x] `DeleteTemplate` on `PlayerRemoved`, for each of their templates (`DeleteTemplatesOnPlayerRemoved`)
   - [x] `CombineTemplatesAfterMerge` on `PlayersMerged`. `Template.movePlayer` (`TemplatePlayerMoved`) repoints the template, and it then combines with an identical one if there is one. A template of the two merged players together is deleted.

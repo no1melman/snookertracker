@@ -23,15 +23,17 @@
 | `MatchScoreCorrected` | `Match` | `CorrectMatchScore` ← Scorer | none (shown on the timeline; stats recalculate) | 29 |
 | `MatchMarkedFinished` | `Match` | `MarkMatchFinished` ← Scorer | none (stats recalculate) | 31 |
 | `MatchDeleted` | `Match` | `DeleteMatch` ← Scorer; policy on `PlayerRemoved` | none | 30, 42 |
+| `MatchPlayerMoved` | `Match` | `MovePlayer` ← policy on `PlayersMerged` (ADR-0009) | none (Stats repoints its record; the live screen shows the kept player) | 33 |
 | `PlayerAdded` | `Player` | `AddPlayer` ← Scorer | none | 2, 3, 48 |
 | `PlayerRenamed` | `Player` | `RenamePlayer` ← Scorer | none | 32 |
 | `PlayerColourChanged` | `Player` | `ChangePlayerColour` ← Scorer | none | 22 |
-| `PlayersMerged` | `Player` | `MergePlayers` ← Scorer | → `CombineTemplates` on `Template`; → `ChangeSeries` on `Series`; → Me follows kept player on `Preferences` | 33 |
+| `PlayersMerged` | `Player` | `MergePlayers` ← Scorer | → `MovePlayer` on each `Match`; → `CombineTemplates` on `Template`; → `ChangeSeries` on `Series`; → Me follows kept player on `Preferences` | 33 |
 | `PlayerArchived` | `Player` | `ArchivePlayer` ← Scorer | none (read-side hiding) | 34 |
 | `PlayerUnarchived` | `Player` | `UnarchivePlayer` ← Scorer | none | 35 |
 | `PlayerRemoved` | `Player` | `RemovePlayer` ← Scorer | → `DeleteMatch` each (S30); → `DeleteTemplate` each; → `ChangeSeries` (remove setups); → clear Me on `Preferences` | 42 |
 | `TemplateCreated` | `Template` | `CreateTemplate` ← policy on `MatchStarted` | none | 1, 2, 12 |
 | `TemplateUsed` | `Template` | `RecordTemplateUse` ← policy on `MatchStarted` | none | 1, 12 |
+| `TemplatePlayerMoved` | `Template` | `CombineTemplates` ← policy on `PlayersMerged` (moves the folded-in player first; not published) | none | 33 |
 | `TemplatesCombined` | `Template` | `CombineTemplates` ← policy on `PlayersMerged` | none | 33 |
 | `TemplateDeleted` | `Template` | `DeleteTemplate` ← Scorer; policy on `PlayerRemoved` | none | 36, 42 |
 | `SeriesCreated` | `Series` | `CreateSeries` ← Scorer | none | 39 |
@@ -61,7 +63,7 @@ Settings (`Preferences`: defaults, live-match limit, Me) raise nothing: scenario
 | app opened, match idle ≥ 6 h | `FlagStaleMatch` | `Match` | 28 |
 | 1st of month | `IssueSeriesSummary` | `Series` | 38 |
 | `LongFrameWarned` / `SeriesSummaryIssued` | notify | iOS Notifications | 37, 38 |
-| `PlayersMerged` | `CombineTemplates`; `ChangeSeries`; Me follows | `Template`, `Series`, `Preferences` | 33 |
+| `PlayersMerged` | `MovePlayer` each; `CombineTemplates`; `ChangeSeries`; Me follows | `Match`, `Template`, `Series`, `Preferences` | 33 |
 | `PlayerRemoved` | `DeleteMatch` each; `DeleteTemplate` each; `ChangeSeries`; clear Me | `Match`, `Template`, `Series`, `Preferences` | 42 → 30 |
 
 ## Aggregate lifecycles
@@ -107,7 +109,7 @@ stateDiagram-v2
   Deleted --> [*]
 ```
 
-Finished, Abandoned and Cancelled are ended states (no play), each exitable only to Deleted. Finished never becomes Abandoned; Cancelled never changes how it ended.
+Finished, Abandoned and Cancelled are ended states (no play), each exitable only to Deleted. Finished never becomes Abandoned; Cancelled never changes how it ended. `MovePlayer / MatchPlayerMoved` [S33] is a self-transition in every state except Deleted (left out of the diagram).
 
 ### Player
 
@@ -130,7 +132,7 @@ stateDiagram-v2
 stateDiagram-v2
   [*] --> Active : CreateTemplate / TemplateCreated [S12]
   Active --> Active : RecordTemplateUse / TemplateUsed [S12]
-  Active --> Active : CombineTemplates / TemplatesCombined [S33]
+  Active --> Active : CombineTemplates / TemplatePlayerMoved, TemplatesCombined [S33]
   Active --> Deleted : DeleteTemplate / TemplateDeleted [S36,S42]
   Active --> Deleted : CombineTemplates / TemplatesCombined (absorbed) [S33]
   Deleted --> [*]

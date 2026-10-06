@@ -101,7 +101,8 @@ public final class SQLiteMatchEventStore: Sendable {
                     INSERT INTO match_streams (stream_id, version, started_at, first_player, second_player, status, is_live)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (stream_id) DO UPDATE SET
-                        version = excluded.version, status = excluded.status, is_live = excluded.is_live
+                        version = excluded.version, status = excluded.status, is_live = excluded.is_live,
+                        first_player = excluded.first_player, second_player = excluded.second_player
                     """,
                     [stream, expectedVersion + events.count, summary.startedAt, players[0], players[1],
                      summary.status, summary.isLive])
