@@ -302,6 +302,130 @@ extension Result {
         #expect(app.readModel.liveMatches.count == 1)
     }
 
+    // MARK: Finish all (S43)
+
+    @Test func finishAllFinishesTheFinishableAndAbandonsTheRestAfterOneWarning() throws {
+        let app = try Stack.inMemory()
+        nonisolated(unsafe) var received: [String] = []
+        app.dispatcher.subscribe(MatchEventPublished.self) { received.append($0.type) }
+        let mostFrames = try app.commands.startMatch(setup())
+        let reached = try app.commands.startMatch(setup(asher, dev, style: .raceTo(2)))
+        try app.commands.chooseBreaker(reached, player: asher)
+        try app.commands.awardFrame(reached, to: dev)
+        try app.commands.awardFrame(reached, to: dev)
+        let short = try app.commands.startMatch(setup(callum, dev, style: .bestOf(5)))
+        try app.commands.chooseBreaker(short, player: dev)
+        try app.commands.awardFrame(short, to: callum)
+        try app.commands.pauseMatch(short)
+
+        #expect(try app.commands.finishAllMatchesPreview() == FinishAllPreview(finishing: 2, abandoning: 1))
+        received = []
+        try app.commands.finishAllMatches()
+
+        #expect(app.readModel.liveMatches.isEmpty)
+        #expect(try app.repository.getById(mostFrames)?.status == .finished)
+        #expect(try app.repository.getById(reached)?.status == .finished)
+        #expect(try app.repository.getById(short)?.status == .abandoned)
+        #expect(received.sorted() == ["MatchAbandoned", "MatchFinished", "MatchFinished"])
+    }
+
+    @Test func finishAllWarnsOfNothingWhenEveryMatchCanFinish() throws {
+        let app = try Stack.inMemory()
+        _ = try app.commands.startMatch(setup())
+        _ = try app.commands.startMatch(setup(asher, dev))
+        let preview = try app.commands.finishAllMatchesPreview()
+        #expect(!preview.willAbandonAny && preview.finishing == 2)
+        try app.commands.finishAllMatches()
+        #expect(app.readModel.liveMatches.isEmpty)
+    }
+
+    // MARK: Correct score (S29)
+
+    @Test func anEndedRaceToScoreIsCorrectedOnTargetOnly() throws {
+        let app = try Stack.inMemory()
+        nonisolated(unsafe) var received: [String] = []
+        app.dispatcher.subscribe(MatchEventPublished.self) { received.append($0.type) }
+        let id = try app.commands.startMatch(setup(style: .raceTo(3)))
+        try app.commands.chooseBreaker(id, player: callum)
+        for _ in 0..<3 { try app.commands.awardFrame(id, to: callum) }
+        try app.commands.finishMatch(id)
+
+        #expect(throws: MatchCommandError.correctionNotOnTarget(3)) {
+            try app.commands.correctMatchScore(id, to: .frames(first: 2, second: 1), confirmed: false)
+        }
+        try app.commands.correctMatchScore(id, to: .frames(first: 3, second: 2), confirmed: false)
+
+        let match = try #require(try app.repository.getById(id))
+        #expect(match.status == .finished)
+        #expect((match.score.firstFrames, match.score.secondFrames) == (3, 2))
+        #expect(received.last == "MatchScoreCorrected")
+    }
+
+    @Test func aSecondCorrectionBuildsOnTheFirstAndBothAreKept() throws {
+        let app = try Stack.inMemory()
+        let id = try app.commands.startMatch(setup())
+        try app.commands.chooseBreaker(id, player: callum)
+        try app.commands.awardFrame(id, to: asher)
+        try app.commands.finishMatch(id)
+
+        try app.commands.correctMatchScore(id, to: .frames(first: 4, second: 2), confirmed: false)
+        try app.commands.correctMatchScore(id, to: .frames(first: 4, second: 5), confirmed: false)
+
+        let match = try #require(try app.repository.getById(id))
+        #expect((match.score.firstFrames, match.score.secondFrames) == (4, 5))
+        #expect(try app.store.readStream(id.uuidString).filter {
+            if case .matchScoreCorrected = $0.event { true } else { false }
+        }.count == 2)
+    }
+
+    @Test func anInconsistentSetsCorrectionIsConfirmedBeforeItIsSaved() throws {
+        let app = try Stack.inMemory()
+        let id = UUID()
+        let style = MatchesDomain.MatchStyle.sets(sets: Target.raceTo(2).value!, frames: Target.raceTo(3).value!)
+        let s = Setup.create(PlayerId(callum), PlayerId(asher), game: .pool, style: style).value!
+        try app.repository.save(Match.start(id: MatchId(id), setup: s, firstColour: Colour.create("red").value!,
+                                            secondColour: Colour.create("blue").value!, at: t0)
+            .finish(at: t0.addingTimeInterval(60), anyway: true).value!)
+        let before = try app.store.readStream(id.uuidString).count
+
+        #expect(throws: MatchCommandError.correctionNeedsConfirmation(["Set 1 doesn't end with one player on the frames target."])) {
+            try app.commands.correctMatchScore(id, to: .sets([SetScore(first: 2, second: 2), SetScore(first: 3, second: 0), SetScore(first: 3, second: 1)]), confirmed: false)
+        }
+        #expect(try app.store.readStream(id.uuidString).count == before)
+
+        try app.commands.correctMatchScore(id, to: .sets([SetScore(first: 2, second: 2), SetScore(first: 3, second: 0), SetScore(first: 3, second: 1)]), confirmed: true)
+        #expect(try app.store.readStream(id.uuidString).count == before + 1)
+    }
+
+    @Test func aCancelledMatchCannotBeCorrected() throws {
+        let app = try Stack.inMemory()
+        let id = try app.commands.startMatch(setup())
+        try app.commands.cancelMatch(id)
+        #expect(throws: MatchCommandError.notAllowedNow) {
+            try app.commands.correctMatchScore(id, to: .frames(first: 1, second: 0), confirmed: true)
+        }
+    }
+
+    // MARK: Mark finished (S31)
+
+    @Test func anAbandonedMatchCanBeMarkedFinishedWithTheLeaderWinning() throws {
+        let app = try Stack.inMemory()
+        nonisolated(unsafe) var received: [String] = []
+        app.dispatcher.subscribe(MatchEventPublished.self) { received.append($0.type) }
+        let id = try app.commands.startMatch(setup(style: .raceTo(5)))
+        try app.commands.chooseBreaker(id, player: callum)
+        try app.commands.awardFrame(id, to: asher)
+        try app.commands.abandonMatch(id)
+
+        try app.commands.markMatchFinished(id)
+
+        let match = try #require(try app.repository.getById(id))
+        #expect(match.status == .finished)
+        #expect(match.result == .win(match.second))
+        #expect(received.last == "MatchMarkedFinished")
+        #expect(throws: MatchCommandError.notAllowedNow) { try app.commands.markMatchFinished(id) }
+    }
+
     @Test func storedEventsArePublishedAfterTheSave() throws {
         let app = try Stack.inMemory()
         nonisolated(unsafe) var received: [MatchEventPublished] = []

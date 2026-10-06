@@ -40,8 +40,18 @@ import Foundation
     func finishMatch(_ match: MatchID, anyway: Bool) throws
     func abandonMatch(_ match: MatchID) throws
     func cancelMatch(_ match: MatchID) throws
+    /// What Finish all would do (S43): the UI shows one dialog, warning when any will be abandoned.
+    func finishAllMatchesPreview() throws -> FinishAllPreview
+    /// `FinishAllMatches` (S43): finishable live matches are finished, the others abandoned.
+    func finishAllMatches() throws
     /// Deletes an ended match (S30); a live match throws `notAllowedNow`.
     func deleteMatch(_ match: MatchID) throws
+    /// `CorrectMatchScore` (S29), finished or abandoned matches only. A race-to score off the target
+    /// throws `correctionNotOnTarget`; an inconsistent sets score throws `correctionNeedsConfirmation`
+    /// (nothing saved) unless `confirmed`.
+    func correctMatchScore(_ match: MatchID, to score: CorrectedScore, confirmed: Bool) throws
+    /// `MarkMatchFinished` (S31): abandoned → finished; anything else throws `notAllowedNow`.
+    func markMatchFinished(_ match: MatchID) throws
 }
 
 // MARK: - Supplier port (Players context, adapted in the composition root)

@@ -4,12 +4,15 @@ import SwiftUI
 
 /// The hub's Live section (spec 009): oldest first, hidden when nothing is live. Swipe a row to
 /// Finish or Abandon it without opening it (spec 015), with the live screen's confirmations.
+/// With several live, Finish all ends them under one dialog (S43).
 public struct LiveMatchesSection: View {
     @Environment(\.matchesPorts) private var ports
     @State private var ending: Ending?
     /// Set when Finish was refused short of the target: ask before finishing anyway.
     @State private var finishAnyway: LiveMatchRow?
     @State private var error: String?
+    /// Set when Finish all was tapped: its one confirmation dialog (S43).
+    @State private var finishAll: FinishAllPreview?
 
     private struct Ending: Identifiable {
         let row: LiveMatchRow
@@ -22,7 +25,7 @@ public struct LiveMatchesSection: View {
     public var body: some View {
         let rows = ports?.live.liveMatches ?? []
         if !rows.isEmpty {
-            Section("Live") {
+            Section {
                 ForEach(rows) { row in
                     NavigationLink(value: MatchRoute.live(row.id)) { LiveMatchRowView(row: row) }
                         .swipeActions {
@@ -34,6 +37,23 @@ public struct LiveMatchesSection: View {
                                 .labelStyle(.iconOnly)
                         }
                 }
+            } header: {
+                HStack {
+                    Text("Live")
+                    Spacer()
+                    // One live match is finished from its own row; Finish all is for several (S43).
+                    if rows.count > 1 {
+                        Button("Finish All") { attempt($error) { finishAll = try ports?.commands.finishAllMatchesPreview() } }
+                            .font(.subheadline.weight(.semibold))
+                            .textCase(nil)
+                    }
+                }
+            }
+            .confirmationDialog(Self.finishAllTitle(finishAll), isPresented: Binding(get: { finishAll != nil }, set: { if !$0 { finishAll = nil } }),
+                                titleVisibility: .visible, presenting: finishAll) { _ in
+                Button("Finish All") { attempt($error) { try ports?.commands.finishAllMatches() } }
+            } message: { preview in
+                Text(Self.finishAllMessage(preview))
             }
             .confirmationDialog(ending.map { LiveMatchView.endTitle($0.action) } ?? "",
                                 isPresented: Binding(get: { ending != nil }, set: { if !$0 { ending = nil } }),
@@ -51,6 +71,18 @@ public struct LiveMatchesSection: View {
             }
             .errorAlert($error)
         }
+    }
+
+    static func finishAllTitle(_ preview: FinishAllPreview?) -> String {
+        guard let preview else { return "" }
+        return "Finish all \(preview.finishing + preview.abandoning) live matches?"
+    }
+
+    static func finishAllMessage(_ p: FinishAllPreview) -> String {
+        guard p.willAbandonAny else { return "Each one goes into the history with its current score." }
+        let some = p.abandoning == 1 ? "1 match hasn't" : "\(p.abandoning) matches haven't"
+        return "\(some) reached the target and will be marked abandoned. "
+            + (p.finishing == 0 ? "" : "The others are finished with their current scores.")
     }
 
     private func end(_ row: LiveMatchRow, _ action: LiveMatchView.EndAction, anyway: Bool = false) {

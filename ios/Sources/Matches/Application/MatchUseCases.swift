@@ -94,10 +94,61 @@ public final class MatchUseCases: MatchCommands {
         try change(match) { $0.cancel(at: $1) }
     }
 
+    // MARK: FinishAllMatches (S43)
+
+    public func finishAllMatchesPreview() throws -> FinishAllPreview {
+        let live = try repository.findLive()
+        let abandoning = live.filter { isShortOfTarget($0) }.count
+        return FinishAllPreview(finishing: live.count - abandoning, abandoning: abandoning)
+    }
+
+    /// Each match is its own transaction; a failure does not stop the rest, and the first is rethrown.
+    public func finishAllMatches() throws {
+        var firstError: (any Error)?
+        for match in try repository.findLive() {
+            let at = now()
+            let ended = isShortOfTarget(match) ? match.abandon(at: at) : match.finish(at: at)
+            do {
+                switch ended {
+                case .success(let changed): try commit(changed)
+                case .failure(let error): throw MatchCommandError(error)
+                }
+            } catch {
+                firstError = firstError ?? error
+            }
+        }
+        if let firstError { throw firstError }
+    }
+
+    private func isShortOfTarget(_ match: Match) -> Bool {
+        if case .failure(.finishShortOfTarget) = match.finish(at: now()) { return true }
+        return false
+    }
+
     // MARK: Maintenance (spec 015)
 
     public func deleteMatch(_ match: MatchID) throws {
         try change(match) { $0.delete(at: $1) }
+    }
+
+    /// One `MatchScoreCorrected` event: it is stored whole or not at all (Q1 default). A second
+    /// correction builds on the first, and each is its own timeline entry (Q2 default).
+    public func correctMatchScore(_ id: MatchID, to score: CorrectedScore, confirmed: Bool) throws {
+        guard let match = try repository.getById(id) else { throw MatchCommandError.notAllowedNow }
+        let correction = try score.domain(for: match.setup.style)
+        switch match.correctScore(correction, at: now()) {
+        case .failure(let error):
+            throw MatchCommandError(error)
+        case .success(let changed):
+            if !correction.warnings.isEmpty, !confirmed {
+                throw MatchCommandError.correctionNeedsConfirmation(correction.warnings.map(\.text))
+            }
+            try commit(changed)
+        }
+    }
+
+    public func markMatchFinished(_ match: MatchID) throws {
+        try change(match) { $0.markFinished(at: $1) }
     }
 
     // MARK: Plumbing

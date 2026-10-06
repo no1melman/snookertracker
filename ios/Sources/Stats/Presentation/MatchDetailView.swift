@@ -3,10 +3,17 @@ import StatsApplication
 import SwiftUI
 
 /// Match detail (spec 013), from `MatchTimeline`: result, corrections beside the original score,
-/// and per frame the winner, frame time, match time and running score.
+/// and per frame the winner, frame time, match time and running score. With `MatchDetailActions`
+/// (spec 015): Edit corrects the score, and the menu marks an abandoned match finished or deletes it.
 public struct MatchDetailView: View {
     let matchID: UUID
     @Environment(\.statsPorts) private var ports
+    @Environment(\.matchDetailActions) private var actions
+    @Environment(\.dismiss) private var dismiss
+    @State private var editing = false
+    @State private var confirmMarkFinished = false
+    @State private var confirmDelete = false
+    @State private var error: String?
 
     public init(matchID: UUID) {
         self.matchID = matchID
@@ -59,6 +66,56 @@ public struct MatchDetailView: View {
             }
         }
         .navigationTitle(HistoryFormat.dayAndTime(t.match.startedAt))
+        .toolbar {
+            if let actions { toolbar(t, actions) }
+        }
+        .sheet(isPresented: $editing) {
+            if let actions {
+                ScoreCorrectionSheet(timeline: t, correct: { try actions.correctScore(matchID, $0, $1) })
+            }
+        }
+        .confirmationDialog("Mark this match finished?", isPresented: $confirmMarkFinished, titleVisibility: .visible) {
+            Button("Mark Finished") { attempt($error) { try actions?.markFinished(matchID) } }
+        } message: {
+            Text("\(markFinishedOutcome(t.match)) It counts in stats from now on, and can't be abandoned again.")
+        }
+        .confirmationDialog("Delete this match?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete Match", role: .destructive) {
+                attempt($error) {
+                    try actions?.delete(matchID)
+                    dismiss()
+                }
+            }
+        } message: {
+            Text("\(HistoryFormat.spokenScore(t.match)) on \(HistoryFormat.dayAndTime(t.match.startedAt)) is removed from the history and stats. This can't be undone.")
+        }
+        .errorAlert($error)
+    }
+
+    @ToolbarContentBuilder
+    private func toolbar(_ t: MatchTimeline, _ actions: MatchDetailActions) -> some ToolbarContent {
+        // Cancelled matches can't be corrected (S29); only abandoned ones can be marked finished (S31).
+        if t.match.status != .cancelled {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Edit") { editing = true }
+                    .accessibilityHint("Correct the score")
+            }
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Menu("More", systemImage: "ellipsis.circle") {
+                if t.match.status == .abandoned {
+                    Button("Mark Finished", systemImage: "flag.checkered") { confirmMarkFinished = true }
+                }
+                Button("Delete Match", systemImage: "trash", role: .destructive) { confirmDelete = true }
+            }
+        }
+    }
+
+    /// Winner as for finishing early: whoever is ahead; level is a draw (S31).
+    private func markFinishedOutcome(_ m: PastMatchRow) -> String {
+        let a = (m.score.firstSets ?? 0, m.score.first), b = (m.score.secondSets ?? 0, m.score.second)
+        if a == b { return "It's level, so it becomes a draw." }
+        return "\(a > b ? m.first.name : m.second.name) is ahead, so wins."
     }
 
     private func header(_ t: MatchTimeline) -> some View {
@@ -185,5 +242,110 @@ private struct FrameRow: View {
         .accessibilityLabel(
             "Frame \(frame.number), \(frame.winner.name) won in \(spokenDuration(frame.frameTime)), "
             + "match time \(spokenDuration(frame.matchTime)), score \(frame.runningScore.first) \(frame.runningScore.second)")
+    }
+}
+
+/// Timeline → Edit (S29): + and − per player and a box to type the whole score; for sets, each
+/// set's frames separately. Refusals (race to off the target) show as errors; sets inconsistencies
+/// are warnings to confirm or fix.
+private struct ScoreCorrectionSheet: View {
+    let timeline: MatchTimeline
+    let correct: @MainActor (ScoreEdit, Bool) throws -> [String]
+    @Environment(\.dismiss) private var dismiss
+    /// One entry for a frames match; one per set for the sets style.
+    @State private var scores: [ScorePair]
+    @State private var typed = ""
+    @State private var warnings: [String] = []
+    @State private var error: String?
+
+    init(timeline: MatchTimeline, correct: @escaping @MainActor (ScoreEdit, Bool) throws -> [String]) {
+        self.timeline = timeline
+        self.correct = correct
+        _scores = State(initialValue: Self.current(timeline))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if timeline.isSets {
+                    ForEach(scores.indices, id: \.self) { i in
+                        Section("Set \(i + 1)") { steppers(i) }
+                    }
+                    Section {
+                        Button("Add Set", systemImage: "plus") { scores.append(ScorePair(first: 0, second: 0)) }
+                        if scores.count > 1 {
+                            Button("Remove Last Set", systemImage: "minus", role: .destructive) { scores.removeLast() }
+                        }
+                    }
+                } else {
+                    Section { steppers(0) }
+                    Section {
+                        TextField("Type a score, e.g. 9–7", text: $typed)
+                            .onSubmit(applyTyped)
+                            .monospacedDigit()
+                    } footer: {
+                        Text("Added frames have no time; the timeline marks them as corrections.")
+                    }
+                }
+            }
+            .navigationTitle("Correct Score")
+            .inlineTitle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { save(confirmed: false) } }
+            }
+            .alert("Save this score?", isPresented: Binding(get: { !warnings.isEmpty }, set: { if !$0 { warnings = [] } })) {
+                Button("Save Anyway") { save(confirmed: true) }
+                Button("Fix It", role: .cancel) {}
+            } message: {
+                Text(warnings.joined(separator: "\n"))
+            }
+            .errorAlert($error)
+        }
+    }
+
+    private func steppers(_ i: Int) -> some View {
+        ForEach([true, false], id: \.self) { isFirst in
+            let player = isFirst ? timeline.match.first : timeline.match.second
+            let value = isFirst ? $scores[i].first : $scores[i].second
+            Stepper(value: value, in: 0...999) {
+                HStack {
+                    PlayerPlate(name: player.name, colour: PlayerColour.color(player.colour), archived: player.isArchived)
+                    Spacer()
+                    Text(value.wrappedValue, format: .number).font(.title3.weight(.semibold)).monospacedDigit()
+                }
+            }
+            .accessibilityValue("\(player.name) \(value.wrappedValue)")
+        }
+    }
+
+    /// "9–7", "9-7" or "9 7".
+    private func applyTyped() {
+        let numbers = typed.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
+        guard numbers.count == 2 else { return }
+        scores[0] = ScorePair(first: numbers[0], second: numbers[1])
+        typed = ""
+    }
+
+    private func save(confirmed: Bool) {
+        if !typed.isEmpty { applyTyped() }
+        let edit: ScoreEdit = timeline.isSets ? .sets(scores) : .frames(scores[0])
+        do {
+            let needsConfirming = try correct(edit, confirmed)
+            if needsConfirming.isEmpty { dismiss() } else { warnings = needsConfirming }
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    /// The score as it stands: frames, or each set's frames counted from the timeline.
+    private static func current(_ t: MatchTimeline) -> [ScorePair] {
+        guard t.isSets else { return [ScorePair(first: t.match.score.first, second: t.match.score.second)] }
+        var sets: [ScorePair] = []
+        for frame in t.frames {
+            while sets.count < frame.setNumber { sets.append(ScorePair(first: 0, second: 0)) }
+            if frame.winner.id == t.match.first.id { sets[frame.setNumber - 1].first += 1 } else { sets[frame.setNumber - 1].second += 1 }
+        }
+        return sets.isEmpty ? [ScorePair(first: 0, second: 0)] : sets
     }
 }

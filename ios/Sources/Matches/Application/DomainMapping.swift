@@ -66,10 +66,48 @@ extension MatchCommandError {
         switch error {
         case .finishShortOfTarget:
             self = .finishShortOfTarget
+        case .invalidScoreCorrection(let e):
+            self = MatchCommandError(e)
         case .notAllowed, .playerNotInMatch, .noFrameToRemove, .noBreakerToCorrect,
              .coloursAlreadyDiffer, .overrideColourNotDifferent, .pauseBeforeLastAction,
-             .notStale, .invalidEndTime, .longFrameThresholdNotReached, .invalidScoreCorrection:
+             .notStale, .invalidEndTime, .longFrameThresholdNotReached:
             self = .notAllowedNow
+        }
+    }
+
+    init(_ error: ScoreCorrectionError) {
+        switch error {
+        case .raceToNeedsExactlyOneOnTarget(let target, _, _): self = .correctionNotOnTarget(target)
+        case .negativeFrames, .styleMismatch: self = .invalidCorrection
+        }
+    }
+}
+
+extension CorrectedScore {
+    /// The domain correction for `style` (with any sets warnings), or the refusal.
+    func domain(for style: MatchesDomain.MatchStyle) throws -> ScoreCorrection {
+        let result: Result<ScoreCorrection, ScoreCorrectionError>
+        switch self {
+        case .frames(let first, let second):
+            result = ScoreCorrection.frames(first: first, second: second, for: style)
+        case .sets(let sets):
+            result = ScoreCorrection.sets(sets.map { SetFrames(first: $0.first, second: $0.second) }, for: style)
+        }
+        switch result {
+        case .success(let correction): return correction
+        case .failure(let e): throw MatchCommandError(e)
+        }
+    }
+}
+
+extension ScoreCorrectionWarning {
+    /// As the scorer reads it before confirming a sets correction.
+    var text: String {
+        switch self {
+        case .noSets: "No sets were entered."
+        case .setNotWonOnTarget(let n): "Set \(n) doesn't end with one player on the frames target."
+        case .setPlayedAfterMatchDecided(let n): "Set \(n) comes after the match was already won."
+        case .setsTargetNotReached: "Nobody reaches the sets target."
         }
     }
 }

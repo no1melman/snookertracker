@@ -78,6 +78,38 @@ public struct MatchDefaults: Hashable, Sendable {
     }
 }
 
+/// `CorrectMatchScore` input (S29): the whole new score, per set for the sets style.
+public enum CorrectedScore: Hashable, Sendable {
+    case frames(first: Int, second: Int)
+    case sets([SetScore])
+}
+
+/// One set's frames, by the setup's first and second player.
+public struct SetScore: Hashable, Sendable {
+    public var first: Int
+    public var second: Int
+
+    public init(first: Int, second: Int) {
+        self.first = first
+        self.second = second
+    }
+}
+
+/// What `FinishAllMatches` will do (S43), asked before its one confirmation dialog.
+public struct FinishAllPreview: Hashable, Sendable {
+    /// Live matches that can be finished: most frames wins, or the target reached.
+    public let finishing: Int
+    /// Live matches short of their target: they will be marked abandoned.
+    public let abandoning: Int
+
+    public init(finishing: Int, abandoning: Int) {
+        self.finishing = finishing
+        self.abandoning = abandoning
+    }
+
+    public var willAbandonAny: Bool { abandoning > 0 }
+}
+
 public enum MatchCommandError: LocalizedError, Equatable {
     case samePlayerTwice
     case invalidTargets
@@ -87,6 +119,12 @@ public enum MatchCommandError: LocalizedError, Equatable {
     case finishShortOfTarget
     /// The match was changed elsewhere since it was loaded; reload and try again.
     case changedElsewhere
+    /// A race-to correction must put exactly one player on the target.
+    case correctionNotOnTarget(Int)
+    /// A correction that doesn't fit the match (negative frames, frames for a sets match).
+    case invalidCorrection
+    /// A sets correction is inconsistent: nothing was saved; confirm to save it anyway.
+    case correctionNeedsConfirmation([String])
 
     public var errorDescription: String? {
         switch self {
@@ -96,6 +134,9 @@ public enum MatchCommandError: LocalizedError, Equatable {
         case .notAllowedNow: "That isn't possible right now."
         case .finishShortOfTarget: "Nobody has reached the target yet. Finishing now counts the match as abandoned."
         case .changedElsewhere: "The match changed while you were scoring. Try again."
+        case .correctionNotOnTarget(let n): "In a race to \(n), exactly one player must have \(n) frames."
+        case .invalidCorrection: "That score doesn't fit this match."
+        case .correctionNeedsConfirmation(let warnings): warnings.joined(separator: "\n")
         }
     }
 }
