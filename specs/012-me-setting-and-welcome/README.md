@@ -23,8 +23,9 @@ Which player is "Me" on this device, and the first-launch welcome. Source: `docs
 - [x] `Me`: an optional `PlayerId`. `set` and `clear` raise nothing.
 - [x] A `MeSettingStore` port and adapter (one per device)
 - [x] `SetMe`: from the welcome, the main menu or settings
-- [ ] `UpdateMeOnMerge`: policy on `PlayersMerged`; Me follows the kept player
-- [ ] `ClearMeOnRemoval`: policy on `PlayerRemoved`
+- [x] `UpdateMeOnMerge`: policy on `PlayersMerged`; Me follows the kept player
+- [x] `ClearMeOnRemoval`: policy on `PlayerRemoved`
+  - Both are `MePolicies` in `PlayersService.swift`, run on the domain events right after the save. Tests: `meFollowsTheKeptPlayerOnMerge`, `removalClearsMeAndPublishesPlayerRemoved`.
 - [ ] `WhoAmI` read model: id and name, displayed "Me (Callum)". Published to Stats.
 - [ ] `Welcome` on first launch: name entry (creates the player and sets Me), then a skippable, replayable walkthrough
 
