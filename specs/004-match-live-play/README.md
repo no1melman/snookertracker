@@ -60,7 +60,7 @@ The event-sourced `Match` aggregate for live play, from starting a match to scor
 **Implementation skills:** `ddd-tactical-patterns`, `ddd-event-sourcing`, `ddd-domain-events` · **Tests:** `ddd-testing`
 
 ## Progress
-- **Done (2026-10-05 audit):** `Match` in `Sources/Matches/Domain/Match.swift` is an immutable, event-sourced struct. Each behaviour returns `Result<Match, MatchError>` and adds to `uncommittedEvents`. `applying(_:)` is the only thing that changes state, and `rehydrate` replays the history. Tests in `Tests/Matches/DomainTests/MatchLivePlayTests.swift` cover every acceptance item, including encode/decode/rebuild.
+- **Done (2026-10-05 audit):** `Match` in `ios/Sources/Matches/Domain/Match.swift` is an immutable, event-sourced struct. Each behaviour returns `Result<Match, MatchError>` and adds to `uncommittedEvents`. `applying(_:)` is the only thing that changes state, and `rehydrate` replays the history. Tests in `ios/Tests/Matches/DomainTests/MatchLivePlayTests.swift` cover every acceptance item, including encode/decode/rebuild.
 - **Decisions:**
   - `start` takes the players' current colours from the caller, and `overrideColour` takes the random colour from the caller, so the domain stays deterministic.
   - `correctBreaker` is allowed in InPlay and Paused, and refused in AwaitingConfirmation and before a breaker exists (`theBreakerCannotBeCorrectedWhileAwaitingConfirmation`).

@@ -1,4 +1,4 @@
-// App icon generator: `swift Design/icon/icon.swift out.png` (1024×1024, Display P3, opaque).
+// App icon generator: `swift ios/Design/icon/icon.swift out.png` (1024×1024, Display P3, opaque).
 // Reference: UK-style pool set — solid yellows, red balls with a cream lower cap, white number spot.
 import CoreGraphics
 import CoreText

@@ -48,10 +48,10 @@ Event-sourced persistence for `Match` and the `MatchRepository` port. Source: `d
 **Implementation skills:** `ddd-event-sourcing`, `ddd-repositories` · **Tests:** `ddd-testing`
 
 ## Progress
-- **Done (2026-10-05 audit):** `SQLiteMatchEventStore` and `EventSourcedMatchRepository` are in `Sources/Matches/Infrastructure/SQLite/`, behind the `MatchRepository` port in `Sources/Matches/Application/MatchRepository.swift`.
+- **Done (2026-10-05 audit):** `SQLiteMatchEventStore` and `EventSourcedMatchRepository` are in `ios/Sources/Matches/Infrastructure/SQLite/`, behind the `MatchRepository` port in `ios/Sources/Matches/Application/MatchRepository.swift`.
   - Events are append-only in `match_events`, with `UNIQUE(stream_id, version)` and a version check inside the transaction.
   - `match_streams` is a derived index that `findLive` and `findByPlayer` query.
-- Integration tests in `Tests/Matches/IntegrationTests/MatchesIntegrationTests.swift` cover the round-trip, the concurrency conflict, `findLive` ordering, `findByPlayer`, reading a full stream in order with event ids and origin device, and the wire versioning.
+- Integration tests in `ios/Tests/Matches/IntegrationTests/MatchesIntegrationTests.swift` cover the round-trip, the concurrency conflict, `findLive` ordering, `findByPlayer`, reading a full stream in order with event ids and origin device, and the wire versioning.
 - **Decisions:**
   - SQLite (system SQLite3 through the `SQLiteSupport` module) is the persistence engine: one DB file per device.
   - Events are serialised by `MatchEventWire`: a stable type name, a schema version and a JSON payload. The store and the published `MatchEventPublished` share it.

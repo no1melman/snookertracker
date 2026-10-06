@@ -84,7 +84,7 @@ The Players context's `Player` aggregate end to end: domain, repository, use cas
 
 ## Progress
 - **Done (2026-10-05 audit):**
-  - The `Player` aggregate and its value objects are in `Sources/Players/Domain`, with domain tests in `Tests/Players/DomainTests` that cover every acceptance item.
+  - The `Player` aggregate and its value objects are in `ios/Sources/Players/Domain`, with domain tests in `ios/Tests/Players/DomainTests` that cover every acceptance item.
   - `SQLitePlayerRepository` is state-stored, with a `name_key` column for case-insensitive lookup.
   - `PlayersService` covers AddPlayer, RenamePlayer and ChangePlayerColour, and serves `PlayersList`.
   - `PlayerEventWire` maps all seven events to the published `PlayerEventPublished`.

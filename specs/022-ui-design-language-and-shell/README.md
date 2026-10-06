@@ -89,7 +89,7 @@ This spec owns the design language, the hub shell and the Settings container. Ea
 
 ## Progress
 - **Done (2026-10-05 audit):**
-  - `HubView` (`Sources/AppComposition/Shell/`) is one `NavigationStack` with a large title and no tab bar. It has New Game first, the Live section (009), then History, Stats, Series, Players and Settings, and a Me row.
+  - `HubView` (`ios/Sources/AppComposition/Shell/`) is one `NavigationStack` with a large title and no tab bar. It has New Game first, the Live section (009), then History, Stats, Series, Players and Settings, and a Me row.
   - `SettingsView` is a `Form` holding the match defaults, the limit stepper and Me.
   - `DesignSystem` provides `ScoreNumeral` (monospaced, `@ScaledMetric` hero size), `PlayerPlate` (archived rows greyed), `PlayerColour` and haptics on +/−.
 - **Decisions:** the tint and the 12-colour palette are placeholders (`Theme.swift`) until the open decision is made. History, Stats and Series rows open a "Coming soon" placeholder.

@@ -53,7 +53,7 @@ Stats projections of match history, built only from Matches' and Players' publis
 - Integration tests: projections are correct after corrections, mark-finished, deletions, merges and removals; past-match ordering and filters
 
 ## Implementation notes (2026-10-05)
-- Code: `Sources/Stats/{Application,Infrastructure,Presentation}`; tests: `Tests/Stats/ContractTests` (19, real Matches store + wire + Stats SQLite).
+- Code: `ios/Sources/Stats/{Application,Infrastructure,Presentation}`; tests: `ios/Tests/Stats/ContractTests` (19, real Matches store + wire + Stats SQLite).
 - **Conformist reader:** Stats decodes the published JSON payloads with its own tolerant DTOs (`PublishedLanguage.swift`); no Matches/Players internals imported.
 - **Stats keeps its own event log** (`stats_match_events`, keyed by event id) and folds each match from it on every event, so corrections, mark-finished and frame removals rebuild the record; `MatchDeleted` drops it. `rebuildAll()` re-folds everything.
 - **Backfill:** Matches publishes an open-host `MatchEventHistory` (in `MatchesPublished`, implemented by `SQLiteMatchEventHistory`). At launch the composition root subscribes Stats before any command can dispatch, then `catchUp` fetches each stream past Stats' per-stream checkpoint. Idempotent with live dispatch.

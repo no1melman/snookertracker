@@ -55,8 +55,8 @@ The Matches value objects, which every Match, Template and MatchSettings behavio
 **Implementation skill:** `ddd-tactical-patterns` · **Tests:** `ddd-testing`
 
 ## Progress
-- **Done (2026-10-05 audit):** every value object is in `Sources/Matches/Domain` (`Identifiers`, `Setup`, `Target`, `Side`, `Frame`, `Tally`, `PlayDuration`, `MatchStatus`, `StaleResolution`, `ScoreCorrection`, `SettingsValues`), with smart constructors returning `Result` and decoding that re-validates.
-- Every acceptance test is in `Tests/Matches/DomainTests/ValueObjectTests.swift` and `MatchStatusTests.swift` (the latter checks every from/to pair against the table).
+- **Done (2026-10-05 audit):** every value object is in `ios/Sources/Matches/Domain` (`Identifiers`, `Setup`, `Target`, `Side`, `Frame`, `Tally`, `PlayDuration`, `MatchStatus`, `StaleResolution`, `ScoreCorrection`, `SettingsValues`), with smart constructors returning `Result` and decoding that re-validates.
+- Every acceptance test is in `ios/Tests/Matches/DomainTests/ValueObjectTests.swift` and `MatchStatusTests.swift` (the latter checks every from/to pair against the table).
 - **Decisions:**
   - `Duration` is named `PlayDuration` so it doesn't shadow `Swift.Duration`.
   - A frame's `Duration?` is `Frame.length`, plus `wonAt`, which is nil for a corrected-in frame.

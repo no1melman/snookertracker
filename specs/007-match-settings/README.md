@@ -47,7 +47,7 @@ Per-device `MatchSettings`: the defaults for a new match and the live-match limi
 
 ## Progress
 - **Done (2026-10-05 audit):**
-  - The domain values are `MatchDefaults.initial` and `LiveMatchLimit` (1…100, default 10) in `Sources/Matches/Domain/SettingsValues.swift`.
+  - The domain values are `MatchDefaults.initial` and `LiveMatchLimit` (1…100, default 10) in `ios/Sources/Matches/Domain/SettingsValues.swift`.
   - `MatchSettingsValues` and the `MatchSettingsStore` port are in `Application/MatchRepository.swift`. `SQLiteMatchSettingsStore` stores them as a single JSON row.
   - `MatchSettingsService` covers `ChangeMatchDefaults`, `SetLiveMatchLimit` and the `MatchSettingsView` read model.
   - The UI is `MatchDefaultsSection` inside the hub's `SettingsView`: game, style and targets, break rule, a 1–100 stepper and the "new matches only" footer. `NewGameView.loadDefaults` opens New Game with these defaults.

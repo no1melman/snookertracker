@@ -58,7 +58,7 @@ transitions:
 **Implementation skills:** `ddd-tactical-patterns`, `ddd-domain-events` · **Tests:** `ddd-testing`
 
 ## Progress
-- **Done (2026-10-05 audit):** every behaviour is on `Match` (`Sources/Matches/Domain/Match.swift`), guarded by the `MatchStatus` transition table. Tests are in `Tests/Matches/DomainTests/MatchEndingTests.swift` and `MatchCorrectionTests.swift`. They cover early finish, end at the winning frame, draws, stale at exactly 6 h, the 30/10-min long-frame thresholds, correction validity and warnings, abandoned → finished only, and the refused transitions.
+- **Done (2026-10-05 audit):** every behaviour is on `Match` (`ios/Sources/Matches/Domain/Match.swift`), guarded by the `MatchStatus` transition table. Tests are in `ios/Tests/Matches/DomainTests/MatchEndingTests.swift` and `MatchCorrectionTests.swift`. They cover early finish, end at the winning frame, draws, stale at exactly 6 h, the 30/10-min long-frame thresholds, correction validity and warnings, abandoned → finished only, and the refused transitions.
 - **Decisions:**
   - `flagStale` takes the suggested end time and the `CappedLength` as inputs. `StaleMatchFlagged` and `LongFrameWarned` don't count as actions, so they don't reset the idle time.
   - `endCapped` ends the match at its last action, with the capped length.

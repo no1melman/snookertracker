@@ -42,7 +42,7 @@ Which player is "Me" on this device, and the first-launch welcome. Source: `docs
 
 ## Progress
 - **Done (2026-10-05 audit):**
-  - The `MeSetting` value is in `Sources/Players/Domain/MeSetting.swift`. `set` and `clear` raise nothing, and it has pure `followingMerge` and `clearingOnRemoval` functions, which domain tests cover.
+  - The `MeSetting` value is in `ios/Sources/Players/Domain/MeSetting.swift`. `set` and `clear` raise nothing, and it has pure `followingMerge` and `clearingOnRemoval` functions, which domain tests cover.
   - `SQLiteMeSettingStore` stores a single row.
   - `PlayersService.setMe` is reachable from Welcome, from the hub's Me row (`MeView`) and from Settings.
   - `AppRoot` shows `WelcomeView` full-screen until Me exists. Entering a name adds the player and sets Me.

@@ -65,7 +65,7 @@ Command-side use cases for starting and playing a match. Source: `docs/ddd-requi
 
 ## Progress
 - **Done (2026-10-05 audit):**
-  - `MatchUseCases` (`Sources/Matches/Application/MatchUseCases.swift`) covers StartMatch (enforcing the live-match limit), ChooseBreaker, AwardFrame, RemoveFrame, Pause and Resume, plus Finish, Abandon and Cancel. Each one is load → behaviour → save → project → dispatch.
+  - `MatchUseCases` (`ios/Sources/Matches/Application/MatchUseCases.swift`) covers StartMatch (enforcing the live-match limit), ChooseBreaker, AwardFrame, RemoveFrame, Pause and Resume, plus Finish, Abandon and Cancel. Each one is load → behaviour → save → project → dispatch.
   - UI: `NewGameView` has defaults, suggestions with inline add, and race-to/best-of-odd steppers. `LiveMatchView` has "X breaks" buttons, a large + and smaller −, haptics through `sensoryFeedback`, and Pause/Resume in the toolbar.
   - Tests are in `MatchUseCaseTests`.
 - **Decisions:**

@@ -37,7 +37,7 @@ Set up the Swift module layout that every other spec builds into, and enforce th
 - Full-state export (S24): the export spec
 
 ## Acceptance criteria
-- Each domain target declares no dependencies in `Package.swift` and imports only Foundation (checked in review and by `/ddd conformance`; SwiftPM cannot forbid system frameworks)
+- Each domain target declares no dependencies in `ios/Package.swift` and imports only Foundation (checked in review and by `/ddd conformance`; SwiftPM cannot forbid system frameworks)
 - Matches cannot import Stats internals, only its OHS protocol module
 - An empty test target passes for each module
 
@@ -45,10 +45,10 @@ Set up the Swift module layout that every other spec builds into, and enforce th
 
 ## Progress
 - **Done (2026-10-05 audit):**
-  - `Package.swift` generates the Domain, Application, Infrastructure, Presentation and Published targets for each context, plus domain and integration test targets. Domain targets declare no dependencies, and every domain file imports only Foundation.
+  - `ios/Package.swift` generates the Domain, Application, Infrastructure, Presentation and Published targets for each context, plus domain and integration test targets. Domain targets declare no dependencies, and every domain file imports only Foundation.
   - Cross-context visibility goes only through `*Published` modules (the `publishedDeps` table). Players → Matches is the customer/supplier adapter `PlayersForMatches` in `AppComposition`.
   - `EventDispatch` holds the dispatcher and the `PublishedEvent` protocol, whose `eventType` and `version` are versioned.
-  - The `AppComposition` module is the composition root. The XcodeGen `project.yml` app target is a thin `@main` over it.
+  - The `AppComposition` module is the composition root. The XcodeGen `ios/project.yml` app target is a thin `@main` over it.
 - **Decisions:** a shared `SQLiteSupport` module is the persistence engine for every context's infrastructure. Presentation depends only on Application (+ `DesignSystem`).
 - **Remains:**
   - `iOSAdapters` is only a placeholder module. The real adapters come with specs 018–020.

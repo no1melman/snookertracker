@@ -54,7 +54,7 @@ Matches query side: live-match views and the open-host queries that Players call
 
 ## Progress
 - **Done (2026-10-05 audit):**
-  - `LiveMatchesProjection` (`Sources/Matches/Application/`) serves `LiveMatches` and most of `LiveMatchScreen`: timers, breaker, available controls, and `targetReachedBy` for the Finish/Undo prompt.
+  - `LiveMatchesProjection` (`ios/Sources/Matches/Application/`) serves `LiveMatches` and most of `LiveMatchScreen`: timers, breaker, available controls, and `targetReachedBy` for the Finish/Undo prompt.
   - Players' names are read at query time through `MatchPlayerDirectory`, so a rename shows straight away.
   - UI: `LiveMatchesSection` (hidden when empty) and `LiveMatchView`, with a clear Paused bar where only Resume and the ⋯ end actions stay enabled.
   - Tests: `liveMatchesAreOldestFirstAndShowThePausedFlag` and `scoringAMatchSurvivesARelaunch`.
