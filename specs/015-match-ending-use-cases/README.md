@@ -35,7 +35,7 @@ Command-side use cases for ending, maintaining and cleaning up matches. Source: 
   - Queries Stats' `AverageFrameTime` and `AverageMatchLength` (3 h fallback)
   - Prompts one match at a time
 - [x] `ResolveStaleMatch`: resume, end at a chosen time, end capped, abandon, cancel (S28)
-- [ ] `WarnLongFrame` (Clock-triggered): define a `NotificationScheduler` port here and test against an in-memory fake; the UserNotifications adapter is in 019
+- [x] `WarnLongFrame` (Clock-triggered): define a `NotificationScheduler` port here and test against an in-memory fake; the UserNotifications adapter is in 019. A policy on published match events that schedules OS notifications ahead (the clock is the OS, so it works while suspended); `LongFrameWarned` is not recorded
 - [x] `CorrectMatchScore` (timeline → Edit). Q1 and Q2 re-deferred (see Progress).
 - [x] `MarkMatchFinished`
 - [x] `DeleteMatch` (swipe + confirmation)

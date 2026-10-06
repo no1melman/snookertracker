@@ -4,6 +4,7 @@ import Foundation
 import MatchesApplication
 import MatchesInfrastructure
 import MatchesPresentation
+import MatchesPublished
 import PlayersApplication
 import PlayersInfrastructure
 import PlayersPresentation
@@ -11,6 +12,9 @@ import SQLiteSupport
 import StatsApplication
 import StatsInfrastructure
 import StatsPresentation
+#if canImport(UserNotifications)
+import UserNotifications
+#endif
 
 /// Composition root: opens the device database, builds the adapters and use cases, and hands their
 /// ports to the presentation layer. One container per process (`shared`).
@@ -23,6 +27,12 @@ final class AppContainer {
     let liveMatches: LiveMatchesProjection
     let matchCommands: MatchUseCases
     let staleMatches: StaleMatchQueue
+    /// Long-frame warnings (S37) as scheduled local notifications (spec 019).
+    let warnLongFrame: WarnLongFrame
+    #if canImport(UserNotifications)
+    private let notifications = UserNotificationsScheduler()
+    private let banners = ForegroundNotificationBanners()
+    #endif
     let templateList: TemplateListProjection
     let templateCommands: TemplateUseCases
     let lifecycle: AppLifecycle
@@ -73,6 +83,12 @@ final class AppContainer {
         matchCommands = MatchUseCases(
             repository: EventSourcedMatchRepository(store: store), settings: matchSettings, players: directory,
             readModel: liveMatches, dispatcher: dispatcher)
+        #if canImport(UserNotifications)
+        warnLongFrame = WarnLongFrame(matches: liveMatches, scheduler: notifications)
+        #else
+        warnLongFrame = WarnLongFrame(matches: liveMatches, scheduler: InMemoryNotificationScheduler())
+        #endif
+        warnLongFrame.subscribe(to: dispatcher)
         staleMatches = StaleMatchQueue(commands: StaleMatchUseCases(
             matches: matchCommands, stats: matchRecords, players: directory))
         // Templates (spec 008): CreateOrUseTemplate reacts to MatchStarted once it is stored.
@@ -99,8 +115,26 @@ final class AppContainer {
             { [staleMatches] in try staleMatches.flag() },
         ]).run(launchedInBackground: AppLifecycle.processLaunchedInBackground)
         try matchCommands.loadLiveMatches()
+        warnLongFrame.rescheduleAll()
+        askForNotificationsOnFirstMatch()
         #if DEBUG
         seedDemoIfRequested()
+        #endif
+    }
+
+    /// Notification permission is asked when a match starts (after Welcome, when a long-frame
+    /// warning makes sense); iOS only shows the prompt once and returns the stored answer after.
+    private func askForNotificationsOnFirstMatch() {
+        #if canImport(UserNotifications)
+        UNUserNotificationCenter.current().delegate = banners
+        var asked = false
+        dispatcher.subscribe(MatchEventPublished.self) { [notifications, warnLongFrame] event in
+            guard event.type == "MatchStarted", !asked else { return }
+            asked = true
+            Task { @MainActor in
+                if await notifications.requestAuthorization() { warnLongFrame.rescheduleAll() }
+            }
+        }
         #endif
     }
 
