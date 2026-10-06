@@ -44,9 +44,9 @@ Command-side use cases for ending, maintaining and cleaning up matches. Source: 
 - [x] The live screen's **⋯ menu**:
   - Finish, Abandon and Cancel, each with a confirmation
   - Finishing a target style early warns "will be abandoned" and offers Finish anyway
-- [ ] The **Finish?** and **Continue?** prompts (S15/S16) offer Undo
+- [x] The **Finish?** and **Continue?** prompts (S15/S16) offer Undo
   - [x] Finish? (target reached): Finish Match / Undo Last Frame
-  - [ ] Continue? (set won): blocked — the sets style isn't offered by New Game, and `LiveMatchScreen` has no set-won flag (read model, spec 009)
+  - [x] Continue? (set won): "Callum wins set 2. Continue?" with Continue / Undo Last Frame, from `LiveMatchScreen.setWon` (spec 009); New Game offers the sets style
 - [x] A **Finish all** action in the hub's Live section (shown with 2+ live matches), with one dialog that warns when any match will be abandoned
 - [x] **Match detail actions** (013):
   - [x] Correct score (Edit from the timeline)

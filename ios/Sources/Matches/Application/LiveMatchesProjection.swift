@@ -15,6 +15,7 @@ public final class LiveMatchesProjection: LiveMatchesQuery, LiveMatchScreenQuery
             let player: PlayerRef
             let colour: String
             let frames: Int
+            let sets: LiveSide.SetsScore?
         }
 
         let id: MatchID
@@ -28,6 +29,9 @@ public final class LiveMatchesProjection: LiveMatchesQuery, LiveMatchScreenQuery
         let matchTimer: TimerReading
         let frameTimer: TimerReading
         let targetReachedBy: PlayerRef?
+        let setWon: SetWonPrompt?
+        let coloursClash: Bool
+        let hasBreaker: Bool
     }
 
     private let directory: any MatchPlayerDirectory
@@ -68,6 +72,12 @@ public final class LiveMatchesProjection: LiveMatchesQuery, LiveMatchScreenQuery
         let leaderBySets: PlayerRef? = score.sets.flatMap { s in
             s.firstSets == s.secondSets ? nil : (s.firstSets > s.secondSets ? first : second)
         }
+        // A set was just won (the current set is back at 0–0 after a frame) and play carries on.
+        var setWon: SetWonPrompt?
+        if let s = score.sets, m.status == .inPlay, s.firstCurrentSetFrames == 0, s.secondCurrentSetFrames == 0,
+           let last = m.frames.last, let winner = last.winner.player.ref {
+            setWon = SetWonPrompt(winner: winner, setNumber: last.setNumber)
+        }
         return Row(
             id: id,
             startedAt: m.startTime.date,
@@ -75,14 +85,19 @@ public final class LiveMatchesProjection: LiveMatchesQuery, LiveMatchScreenQuery
             style: MatchStyle(m.setup.style),
             breakRule: BreakRule(m.setup.breakRule),
             sides: [
-                Row.Side(player: first, colour: m.sides[0].colour.name, frames: score.firstFrames),
-                Row.Side(player: second, colour: m.sides[1].colour.name, frames: score.secondFrames),
+                Row.Side(player: first, colour: m.sides[0].colour.name, frames: score.firstFrames,
+                         sets: score.sets.map { .init(setsWon: $0.firstSets, currentSetFrames: $0.firstCurrentSetFrames) }),
+                Row.Side(player: second, colour: m.sides[1].colour.name, frames: score.secondFrames,
+                         sets: score.sets.map { .init(setsWon: $0.secondSets, currentSetFrames: $0.secondCurrentSetFrames) }),
             ],
             breaker: m.nextBreaker?.player.ref,
             status: m.status,
             matchTimer: timer(m.matchLength(at: now)),
             frameTimer: timer(m.frameLength(at: now)),
-            targetReachedBy: m.status == .awaitingConfirmation ? (score.sets == nil ? leader : leaderBySets) : nil)
+            targetReachedBy: m.status == .awaitingConfirmation ? (score.sets == nil ? leader : leaderBySets) : nil,
+            setWon: setWon,
+            coloursClash: m.status == .awaitingBreaker && m.sides[0].colour == m.sides[1].colour,
+            hasBreaker: m.breakerOrigin != nil)
     }
 
     // MARK: Queries
@@ -102,17 +117,19 @@ public final class LiveMatchesProjection: LiveMatchesQuery, LiveMatchScreenQuery
             award: row.status == .inPlay,
             removeFrom: scoring.contains(row.status) ? Set(row.sides.filter { $0.frames > 0 }.map(\.player)) : [],
             pause: row.status == .awaitingBreaker || row.status == .inPlay,
-            resume: row.status == .paused)
+            resume: row.status == .paused,
+            correctBreaker: row.hasBreaker && (row.status == .inPlay || row.status == .paused))
         return LiveMatchScreen(
             id: row.id, startedAt: row.startedAt, game: row.game, style: row.style, breakRule: row.breakRule,
             sides: sides(row), matchTimer: row.matchTimer, frameTimer: row.frameTimer,
-            isPaused: row.status == .paused, controls: controls, targetReachedBy: row.targetReachedBy)
+            isPaused: row.status == .paused, controls: controls, targetReachedBy: row.targetReachedBy,
+            setWon: row.setWon, coloursClash: row.coloursClash)
     }
 
     private func sides(_ row: Row) -> [LiveSide] {
         row.sides.map { side in
             LiveSide(id: side.player, name: directory.player(side.player)?.name ?? "?", colour: side.colour,
-                     frames: side.frames, isBreaker: row.breaker == side.player)
+                     frames: side.frames, isBreaker: row.breaker == side.player, sets: side.sets)
         }
     }
 }

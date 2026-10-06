@@ -22,11 +22,11 @@ Matches query side: live-match views and the open-host queries that Players call
 
 ## Requirements
 - [x] `LiveMatches`: match id, players, colours, score, match timer, paused. Oldest started first.
-- [ ] `LiveMatchScreen`:
+- [x] `LiveMatchScreen`:
   - Day + time, sides with colours, score (sets format), breaker dot
   - Match timer, frame timer, paused, available controls
   - Head-to-head from Stats' `HeadToHead` OHS (inject the protocol, so it can be stubbed until Stats lands)
-  - Partial: day and time, timers, breaker and controls are built. Missing: the sets score format and the `HeadToHead` field (the model says "Head-to-head is not provided yet").
+  - Done (2026-10-06): `LiveSide.sets` and `LiveMatchScreen.scoreText` ("(1) 5 – 2 (0)"), `setWon` (Continue? prompt), `coloursClash` (S46), `controls.correctBreaker`. Head-to-head is `LiveHeadToHead.lookup(any MatchStatsQueries)`, handed to the view as `MatchesPorts.headToHead`.
 - [x] `LockScreenState`: the oldest live match (as `findLive`), or none: match id, sides, score, breaker, frame timer, paused (Q4 noted). Moves to the next-oldest when the shown match ends (ADR-0004).
 - [ ] OHS `IsPlayerInLiveMatch(PlayerId)`: used by Players' archive guard and the "are you sure" check on start
   - Partial: the protocol `PlayerMatchQueries.isPlayerInLiveMatch` is published in `MatchesPublished`, but nothing implements, wires or tests it yet.
@@ -38,15 +38,15 @@ Matches query side: live-match views and the open-host queries that Players call
 - [x] The hub's **Live** section, from `LiveMatches`:
   - Oldest first, one row per match: both colour plates and names, the score in monospaced digits, a running match timer, and a Paused label
   - Tapping a row opens the live screen. The section is hidden when there are no live matches.
-- [ ] The **live screen**, from `LiveMatchScreen`:
-  - Partial: columns, breaker dot, timers, day and time, and controls are built. The head-to-head strip is missing.
+- [x] The **live screen**, from `LiveMatchScreen`:
+  - Done (2026-10-06): `HeadToHeadStrip` under the columns (matches, frames, deciders only when non-zero; drawn in the caption), hidden when empty or when `MatchesPorts.headToHead` is nil. Sets show current-set frames huge with "(sets)" beneath.
   - Two player columns, each with a colour plate, name and huge frame count; a dot marks the breaker
   - Frame timer, match timer, and day and time are secondary
   - A head-to-head strip underneath, hidden when the players have no history
   - Controls are enabled from "available controls"
 - [x] **Paused:** a clear Paused state, timers frozen, and every control except Resume disabled
-- [ ] **VoiceOver** reads the score as "Asher 4, Me 3", plus the breaker and the paused state. At accessibility Dynamic Type sizes the score stays legible.
-  - Partial: each column reads "Asher 4, to break" separately, not one "Asher 4, Me 3". The paused state is not spoken on the live screen. The hub row does read the score as specified.
+- [x] **VoiceOver** reads the score as "Asher 4, Me 3", plus the breaker and the paused state. At accessibility Dynamic Type sizes the score stays legible.
+  - Done (2026-10-06): the live screen's header is one element, "Asher 4, Me 3. Asher to break. Paused. Frame 8, …" (`spokenLiveScore`; sets read "Asher 2 (1 set)"). Columns hide the numerals and hold only the buttons.
 
 ## Non-goals
 - Past-match lists and stats (Stats context)
@@ -71,6 +71,12 @@ Matches query side: live-match views and the open-host queries that Players call
   - The `IsPlayerInLiveMatch` and `HavePlayedEachOther` OHS in `MatchesPublished`.
   - VoiceOver reads the live screen per column, not "Asher 4, Me 3". The hub row does read it that way.
   - Integration tests for the sets format and the lock-screen hand-over.
+
+## Progress (2026-10-06, live screen)
+- Built: sets score format, set-won flag, colour-clash flag, correct-breaker control, head-to-head adapter and strip, one-line VoiceOver score. Tests in `MatchUseCaseTests`: `aSetsMatchShowsTheSetsScoreAndAsksToContinueAfterEachSet`, `theScoreIsSpokenAsOneLine`, `theHeadToHeadComesFromStatsFromTheFirstPlayersPointOfView`, `sharedColoursAreFlagged…`.
+- Decision: the set-won flag is derived (sets style, in play, current set at 0–0 after a frame), so it clears on the next frame or on Undo; Continue only dismisses it on the screen (no domain event).
+- The hub's Live rows (`LiveMatchesSection`) still show total frames for a sets match.
+- Note: the two OHS queries are now implemented by `MatchesForPlayers` (Policies/), outside this pass.
 
 ## Progress (2026-10-06)
 - Verified: `LockScreenState` (`LockScreenState.swift`, a view over `LiveMatchesProjection`) is built, with `LockScreenStateTests` covering none, oldest, a later match not replacing it, paused, hand-over to the next-oldest on finish, abandon and cancel, and a relaunch, so it is ticked. Still open: `LiveMatchScreen` (no sets format or head-to-head), the two OHS queries (protocol only), the live-screen head-to-head strip, and VoiceOver.

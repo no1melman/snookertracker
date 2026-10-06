@@ -14,6 +14,10 @@ public struct LiveMatchView: View {
     @State private var ending: EndAction?
     /// Set when Finish was refused short of the target: ask before finishing anyway.
     @State private var finishAnyway = false
+    /// The set win the scorer chose to continue from (S16), so its prompt doesn't come back.
+    @State private var continuedSet: SetWonPrompt?
+    /// The scorer kept both players in the same colour (S46).
+    @State private var keepSameColour = false
 
     public init(matchID: MatchID) {
         self.matchID = matchID
@@ -48,6 +52,10 @@ public struct LiveMatchView: View {
             }
             .padding(.horizontal)
             .frame(maxHeight: .infinity)
+            if let lookup = ports?.headToHead, screen.sides.count == 2 {
+                let record = lookup(screen.sides[0].id, screen.sides[1].id)
+                if !record.isEmpty { HeadToHeadStrip(record: record, sides: screen.sides) }
+            }
             if screen.isPaused { pausedBar(commands) }
         }
         .navigationTitle(screen.style.title)
@@ -63,6 +71,16 @@ public struct LiveMatchView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Menu("More", systemImage: "ellipsis.circle") {
+                    Menu("Correct Breaker", systemImage: "arrow.left.arrow.right") {
+                        ForEach(screen.sides) { side in
+                            Button("\(side.name) is breaking") {
+                                attempt($error) { try commands.correctBreaker(matchID, player: side.id) }
+                            }
+                            .disabled(side.isBreaker)
+                        }
+                    }
+                    .disabled(!screen.controls.correctBreaker)
+                    Divider()
                     Button("Finish Match", systemImage: "flag.checkered") { ending = .finish }
                     Button("Abandon Match", systemImage: "xmark.circle") { ending = .abandon }
                     Button("Cancel Match", systemImage: "trash", role: .destructive) { ending = .cancel }
@@ -86,7 +104,60 @@ public struct LiveMatchView: View {
                 if let p = screen.targetReachedBy { attempt($error) { try commands.removeFrame(matchID, from: p) } }
             }
         } message: {
-            Text("\(screen.sides.map { "\($0.name) \($0.frames)" }.joined(separator: " – ")). Undo if the frame was a mis-tap.")
+            Text("\(scoreLine(screen)). Undo if the frame was a mis-tap.")
+        }
+        // S16: a set won short of the match. + stays behind the prompt until Continue or Undo (Q3).
+        .alert(setTitle(screen), isPresented: .constant(showsContinue(screen))) {
+            Button("Continue") { continuedSet = screen.setWon }
+            Button("Undo Last Frame", role: .cancel) {
+                if let p = screen.setWon?.winner { attempt($error) { try commands.removeFrame(matchID, from: p) } }
+            }
+        } message: {
+            Text("\(scoreLine(screen)). Undo if the frame was a mis-tap.")
+        }
+        // S46: both players share a colour; offer one of them a temporary colour for this match.
+        .alert("Same colour", isPresented: .constant(screen.coloursClash && !keepSameColour && ending == nil)) {
+            Button("Use a Temporary Colour") { overrideColour(screen, commands) }
+            Button("Keep Both", role: .cancel) { keepSameColour = true }
+        } message: {
+            Text("\(screen.sides.map(\.name).joined(separator: " and ")) are both \(screen.sides.first?.colour ?? ""). Give \(recolouredSide(screen)?.name ?? "one of them") a different colour for this match only?")
+        }
+    }
+
+    private func showsContinue(_ screen: LiveMatchScreen) -> Bool {
+        guard let won = screen.setWon else { return false }
+        return won != continuedSet && screen.targetReachedBy == nil && ending == nil && !screen.isPaused
+    }
+
+    private func setTitle(_ screen: LiveMatchScreen) -> String {
+        guard let won = screen.setWon else { return "" }
+        let name = screen.sides.first { $0.id == won.winner }?.name ?? ""
+        return "\(name) wins set \(won.setNumber). Continue?"
+    }
+
+    /// "Callum 3 – 1 Asher", or for sets "Callum (1) 0 – 0 (0) Asher".
+    private func scoreLine(_ screen: LiveMatchScreen) -> String {
+        guard screen.sides.count == 2 else { return "" }
+        return "\(screen.sides[0].name) \(screen.scoreText) \(screen.sides[1].name)"
+    }
+
+    /// The side given the temporary colour: the opponent of Me when Me plays, else the second side.
+    private func recolouredSide(_ screen: LiveMatchScreen) -> LiveSide? {
+        if let me = ports?.players.me, screen.sides.contains(where: { $0.id == me }) {
+            return screen.sides.first { $0.id != me }
+        }
+        return screen.sides.last
+    }
+
+    private func overrideColour(_ screen: LiveMatchScreen, _ commands: any MatchCommands) {
+        guard let side = recolouredSide(screen) else { return }
+        let shared = side.colour
+        let colour = PlayerColour.allCases.filter { $0.rawValue != shared }.randomElement() ?? .gray
+        do {
+            try commands.overrideMatchColour(matchID, of: side.id, to: colour.rawValue)
+        } catch {
+            keepSameColour = true
+            self.error = error.localizedDescription
         }
     }
 
@@ -112,7 +183,15 @@ public struct LiveMatchView: View {
                 .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Frame \(screen.frameNumber), \(spokenDuration(screen.frameTimer.elapsed(at: ctx.date))). Match time \(spokenDuration(screen.matchTimer.elapsed(at: ctx.date)))")
+            // Read first: "Asher 4, Me 3. Asher to break. Paused. Frame 8, …".
+            .accessibilityLabel([
+                spokenScore(screen.sides),
+                screen.sides.first(where: \.isBreaker).map { "\($0.name) to break" },
+                screen.isPaused ? "Paused" : nil,
+                "Frame \(screen.frameNumber), \(spokenDuration(screen.frameTimer.elapsed(at: ctx.date)))",
+                "Match time \(spokenDuration(screen.matchTimer.elapsed(at: ctx.date)))",
+            ].compactMap { $0 }.joined(separator: ". "))
+            .accessibilityAddTraits(.isHeader)
         }
         .padding(.vertical, 12)
     }
@@ -213,10 +292,20 @@ struct PlayerColumn: View {
                         .frame(width: 10, height: 10)
                 }
             }
-            ScoreNumeral(side.frames, size: .hero)
+            .accessibilityHidden(true)
+            // Sets (S16): current-set frames, with sets won in brackets underneath.
+            ScoreNumeral(side.scoreFrames, size: .hero)
                 .foregroundStyle(screen.isPaused ? .secondary : .primary)
                 .frame(maxWidth: .infinity)
-                .animation(.snappy, value: side.frames)
+                .animation(.snappy, value: side.scoreFrames)
+                .accessibilityHidden(true)
+            if let sets = side.sets {
+                Text("(\(sets.setsWon))")
+                    .font(.title.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
             Spacer(minLength: 0)
             if screen.controls.chooseBreaker {
                 Button {
@@ -255,7 +344,53 @@ struct PlayerColumn: View {
         }
         .padding(.bottom)
         .sensoryFeedback(trigger: side.frames) { old, new in new > old ? .increase : .decrease }
+        // The score is read once, as "Asher 4, Me 3", by the header; the column holds the buttons.
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(side.name) \(side.frames)\(side.isBreaker ? ", to break" : "")")
+        .accessibilityLabel(side.name)
+    }
+}
+
+/// The all-time head-to-head (S14) under the columns, from each column's point of view: matches,
+/// frames, and deciders only when there are any. Hidden when the players have no finished match.
+struct HeadToHeadStrip: View {
+    let record: LiveHeadToHead
+    let sides: [LiveSide]
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Text(record.drawn > 0 ? "Head to head · \(record.drawn) drawn" : "Head to head")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            row("Matches", record.won, record.lost)
+            row("Frames", record.framesWon, record.framesLost)
+            if record.showsDeciders { row("Deciders", record.decidersWon, record.decidersLost) }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background(.quaternary.opacity(0.5))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken)
+    }
+
+    private func row(_ title: String, _ first: Int, _ second: Int) -> some View {
+        HStack {
+            Text(first, format: .number).frame(maxWidth: .infinity)
+            Text(title).font(.subheadline).foregroundStyle(.secondary).frame(minWidth: 80)
+            Text(second, format: .number).frame(maxWidth: .infinity)
+        }
+        .font(.headline)
+        .monospacedDigit()
+    }
+
+    /// "Head to head: Asher won 5, Me won 3, 1 drawn. Frames 20 to 14. Deciders 3 to 1."
+    private var spoken: String {
+        let (a, b) = (sides.first?.name ?? "", sides.last?.name ?? "")
+        var parts = ["Head to head: \(a) won \(record.won), \(b) won \(record.lost)"]
+        if record.drawn > 0 { parts[0] += ", \(record.drawn) drawn" }
+        parts.append("Frames \(record.framesWon) to \(record.framesLost)")
+        if record.showsDeciders { parts.append("Deciders \(record.decidersWon) to \(record.decidersLost)") }
+        return parts.joined(separator: ". ")
     }
 }

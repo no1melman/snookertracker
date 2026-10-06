@@ -58,10 +58,27 @@ public final class MatchUseCases: MatchCommands {
         return id
     }
 
+    public func playersAlreadyLive(_ request: MatchSetup) throws -> [MatchPlayer] {
+        let live = try repository.findLive()
+        return request.players.filter { ref in
+            live.contains { $0.setup.players.contains(PlayerId(ref: ref)) }
+        }
+        .map { players.player($0) ?? MatchPlayer(id: $0, name: "?", colour: "gray") }
+    }
+
     // MARK: Live play
 
     public func chooseBreaker(_ match: MatchID, player: PlayerRef) throws {
         try change(match) { $0.chooseBreaker(PlayerId(ref: player), at: $1) }
+    }
+
+    public func correctBreaker(_ match: MatchID, player: PlayerRef) throws {
+        try change(match) { $0.correctBreaker(PlayerId(ref: player), at: $1) }
+    }
+
+    public func overrideMatchColour(_ match: MatchID, of player: PlayerRef, to colour: String) throws {
+        guard case .success(let colour) = Colour.create(colour) else { throw MatchCommandError.notAllowedNow }
+        try change(match) { $0.overrideColour(of: PlayerId(ref: player), to: colour, at: $1) }
     }
 
     public func awardFrame(_ match: MatchID, to player: PlayerRef) throws {

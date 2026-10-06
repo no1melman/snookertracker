@@ -5,6 +5,7 @@ import MatchesDomain
 import MatchesInfrastructure
 import MatchesPublished
 import SQLiteSupport
+import StatsPublished
 import Testing
 
 // Outside-in: real use cases and adapters over a real SQLite database (in memory, or a temp file
@@ -14,6 +15,8 @@ import Testing
 private let callum = UUID()
 private let asher = UUID()
 private let dev = UUID()
+/// Shares Callum's colour (S46).
+private let eve = UUID()
 private let device = UUID()
 private let t0 = Date(timeIntervalSince1970: 1_790_000_000)
 
@@ -23,6 +26,7 @@ private final class FixedPlayers: MatchPlayerDirectory {
         MatchPlayer(id: callum, name: "Callum", colour: "blue"),
         MatchPlayer(id: asher, name: "Asher", colour: "orange"),
         MatchPlayer(id: dev, name: "Dev", colour: "green"),
+        MatchPlayer(id: eve, name: "Eve", colour: "blue"),
     ]
     var suggestions: [MatchPlayer] { all }
     var me: PlayerRef? { callum }
@@ -439,4 +443,159 @@ extension Result {
         let stored = try app.store.readStream(id.uuidString)
         #expect(received.map(\.eventId) == stored.map(\.eventId))
     }
+
+    // MARK: Correct breaker (S41)
+
+    @Test func theBreakerCanBeCorrectedInPlayOrPausedAndTheRuleCarriesOn() throws {
+        let app = try Stack.inMemory()
+        let id = try app.commands.startMatch(setup())
+        #expect(app.readModel.liveMatchScreen(id)?.controls.correctBreaker == false)
+        #expect(throws: MatchCommandError.notAllowedNow) { try app.commands.correctBreaker(id, player: asher) }
+
+        try app.commands.chooseBreaker(id, player: callum)
+        try app.commands.awardFrame(id, to: callum)  // alternate: Asher breaks frame 2
+        #expect(app.readModel.liveMatchScreen(id)?.controls.correctBreaker == true)
+        try app.commands.correctBreaker(id, player: callum)
+        #expect(app.readModel.liveMatchScreen(id)?.sides.first { $0.isBreaker }?.id == callum)
+
+        try app.commands.awardFrame(id, to: asher)  // carries on alternating from Callum
+        #expect(app.readModel.liveMatchScreen(id)?.sides.first { $0.isBreaker }?.id == asher)
+
+        try app.commands.pauseMatch(id)
+        #expect(app.readModel.liveMatchScreen(id)?.controls.correctBreaker == true)
+        try app.commands.correctBreaker(id, player: callum)
+        #expect(try app.repository.getById(id)?.nextBreaker?.player == PlayerId(callum))
+    }
+
+    // MARK: Override colour (S46)
+
+    @Test func sharedColoursAreFlaggedAndATemporaryColourChangesOnlyThisMatch() throws {
+        let app = try Stack.inMemory()
+        nonisolated(unsafe) var received: [String] = []
+        app.dispatcher.subscribe(MatchEventPublished.self) { received.append($0.type) }
+        let clash = try app.commands.startMatch(setup(callum, eve))
+        let noClash = try app.commands.startMatch(setup(asher, dev))
+        #expect(app.readModel.liveMatchScreen(clash)?.coloursClash == true)
+        #expect(app.readModel.liveMatchScreen(noClash)?.coloursClash == false)
+
+        try app.commands.overrideMatchColour(clash, of: eve, to: "pink")
+
+        let screen = try #require(app.readModel.liveMatchScreen(clash))
+        #expect(screen.sides.map(\.colour) == ["blue", "pink"])
+        #expect(!screen.coloursClash)
+        #expect(received.last == "MatchColourOverridden")
+        #expect(throws: MatchCommandError.notAllowedNow) { try app.commands.overrideMatchColour(noClash, of: dev, to: "pink") }
+    }
+
+    @Test func theColourCanOnlyBeOverriddenBeforeTheBreakerIsChosen() throws {
+        let app = try Stack.inMemory()
+        let id = try app.commands.startMatch(setup(callum, eve))
+        try app.commands.chooseBreaker(id, player: callum)
+        #expect(app.readModel.liveMatchScreen(id)?.coloursClash == false)
+        #expect(throws: MatchCommandError.notAllowedNow) { try app.commands.overrideMatchColour(id, of: eve, to: "pink") }
+    }
+
+    // MARK: Already in a live match (S11)
+
+    @Test func playersAlreadyInALiveMatchAreNamedBeforeStarting() throws {
+        let app = try Stack.inMemory()
+        let first = try app.commands.startMatch(setup(callum, asher))
+        #expect(try app.commands.playersAlreadyLive(setup(asher, dev)).map(\.name) == ["Asher"])
+        #expect(try app.commands.playersAlreadyLive(setup(callum, asher)).map(\.name) == ["Callum", "Asher"])
+        #expect(try app.commands.playersAlreadyLive(setup(dev, eve)).isEmpty)
+
+        // Confirmed, the second match starts; once the first ends nobody is live elsewhere.
+        _ = try app.commands.startMatch(setup(asher, dev))
+        try app.commands.cancelMatch(first)
+        #expect(try app.commands.playersAlreadyLive(setup(callum, eve)).isEmpty)
+    }
+
+    // MARK: Sets (S16)
+
+    @Test func aSetsMatchShowsTheSetsScoreAndAsksToContinueAfterEachSet() throws {
+        let app = try Stack.inMemory()
+        let id = try app.commands.startMatch(setup(style: .sets(sets: 2, frames: 2)))
+        try app.commands.chooseBreaker(id, player: callum)
+        var screen = try #require(app.readModel.liveMatchScreen(id))
+        #expect(screen.style == .sets(sets: 2, frames: 2))
+        #expect(screen.scoreText == "(0) 0 – 0 (0)")
+
+        try app.commands.awardFrame(id, to: callum)
+        #expect(app.readModel.liveMatchScreen(id)?.scoreText == "(0) 1 – 0 (0)")
+        #expect(app.readModel.liveMatchScreen(id)?.setWon == nil)
+
+        try app.commands.awardFrame(id, to: callum)
+        screen = try #require(app.readModel.liveMatchScreen(id))
+        #expect(screen.setWon == SetWonPrompt(winner: callum, setNumber: 1))
+        #expect(screen.targetReachedBy == nil)
+        #expect(screen.scoreText == "(1) 0 – 0 (0)")
+        #expect(screen.sides.map(\.frames) == [2, 0])
+        #expect(screen.sides.map(\.scoreFrames) == [0, 0])
+        #expect(spokenLiveScore(screen.sides) == "Callum 0 (1 set), Asher 0 (0 sets)")
+
+        // Undo reverts the set win.
+        try app.commands.removeFrame(id, from: callum)
+        #expect(app.readModel.liveMatchScreen(id)?.setWon == nil)
+        #expect(app.readModel.liveMatchScreen(id)?.scoreText == "(0) 1 – 0 (0)")
+
+        // Continue: the next frame clears the prompt.
+        try app.commands.awardFrame(id, to: callum)
+        try app.commands.awardFrame(id, to: asher)
+        #expect(app.readModel.liveMatchScreen(id)?.setWon == nil)
+        #expect(app.readModel.liveMatchScreen(id)?.scoreText == "(1) 0 – 1 (0)")
+
+        // The deciding set asks to finish instead.
+        try app.commands.awardFrame(id, to: callum)
+        try app.commands.awardFrame(id, to: callum)
+        screen = try #require(app.readModel.liveMatchScreen(id))
+        #expect(screen.targetReachedBy == callum)
+        #expect(screen.setWon == nil)
+        try app.commands.finishMatch(id)
+        #expect(try app.repository.getById(id)?.status == .finished)
+    }
+
+    @Test func aSetsStyleIsValidatedAndKeptAsADefault() throws {
+        let app = try Stack.inMemory()
+        #expect(throws: MatchCommandError.invalidTargets) { try app.commands.startMatch(setup(style: .sets(sets: 0, frames: 3))) }
+        try app.settings.changeDefaults(.init(game: .snooker, style: .sets(sets: 3, frames: 4), breakRule: .alternate))
+        #expect(app.settings.defaults.style == .sets(sets: 3, frames: 4))
+    }
+
+    // MARK: VoiceOver score and head-to-head (S14)
+
+    @Test func theScoreIsSpokenAsOneLine() throws {
+        let app = try Stack.inMemory()
+        let id = try app.commands.startMatch(setup(asher, callum))
+        try app.commands.chooseBreaker(id, player: callum)
+        for winner in [asher, asher, callum, asher] { try app.commands.awardFrame(id, to: winner) }
+        let screen = try #require(app.readModel.liveMatchScreen(id))
+        #expect(spokenLiveScore(screen.sides) == "Asher 3, Callum 1")
+        #expect(screen.scoreText == "3 – 1")
+    }
+
+    @Test func theHeadToHeadComesFromStatsFromTheFirstPlayersPointOfView() throws {
+        let stats = StubStats()
+        let lookup = LiveHeadToHead.lookup(stats)
+
+        let record = lookup(callum, asher)
+        #expect(stats.asked == [[callum, asher]])
+        #expect(record == LiveHeadToHead(won: 5, drawn: 1, lost: 3, framesWon: 20, framesLost: 14, decidersWon: 0, decidersLost: 0))
+        #expect(!record.isEmpty)
+        #expect(!record.showsDeciders)
+
+        stats.next = HeadToHead(won: 1, drawn: 0, lost: 0, framesWon: 3, framesLost: 2, decidersWon: 1, decidersLost: 0)
+        #expect(lookup(callum, asher).showsDeciders)
+        stats.next = .none
+        #expect(lookup(callum, dev).isEmpty)
+    }
+}
+
+/// Stats' open-host query, stubbed: Stats is another context.
+@MainActor
+private final class StubStats: MatchStatsQueries {
+    var next = HeadToHead(won: 5, drawn: 1, lost: 3, framesWon: 20, framesLost: 14, decidersWon: 0, decidersLost: 0)
+    var asked: [[UUID]] = []
+    func headToHead(_ a: UUID, _ b: UUID) -> HeadToHead { asked.append([a, b]); return next }
+    func averageFrameTime(_ player: UUID) -> TimeInterval? { nil }
+    func averageMatchLength(_ a: UUID, _ b: UUID, weekday: Int) -> TimeInterval? { nil }
 }

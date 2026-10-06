@@ -172,7 +172,8 @@ final class AppContainer {
 
     var matchesPorts: MatchesPorts {
         MatchesPorts(live: liveMatches, screens: liveMatches, commands: matchCommands, settings: matchSettings,
-                     players: directory, templates: templateList, templateCommands: templateCommands)
+                     players: directory, templates: templateList, templateCommands: templateCommands,
+                     headToHead: LiveHeadToHead.lookup(matchRecords))
     }
 
     var seriesPorts: SeriesPorts {

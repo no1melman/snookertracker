@@ -31,15 +31,15 @@ Command-side use cases for starting and playing a match. Source: `docs/ddd-requi
   - Enforces the live-match limit from `MatchSettings`
   - Asks "already in a live match?" (`IsPlayerInLiveMatch`)
   - Load settings → `Match.start` → save → dispatch
-  - Partial: limit check and load, start, save, dispatch are built and tested. Missing: the `IsPlayerInLiveMatch` check, and starting from a template.
-- [ ] `ChooseBreaker` and `CorrectBreaker` (from the match menu)
-  - Partial: `chooseBreaker` is built. The domain has `Match.correctBreaker`, but there is no use case, menu item or integration test.
+  - Partial: limit check and load, start, save, dispatch are built and tested. The "already live" check is `MatchCommands.playersAlreadyLive(setup)`, asked by New Game before `startMatch` (a query, like `finishAllMatchesPreview`, so `startMatch` callers are unchanged); tested by `playersAlreadyInALiveMatchAreNamedBeforeStarting`. Template starts go through New Game's Recent list (008).
+- [x] `ChooseBreaker` and `CorrectBreaker` (from the match menu)
+  - Done (2026-10-06): `MatchCommands.correctBreaker`, tested by `theBreakerCanBeCorrectedInPlayOrPausedAndTheRuleCarriesOn`.
 - [ ] `AwardFrame` (in the app or on the lock screen). **Resolve Q3** (+ while a Finish/Continue prompt shows) and **Q4** (lock-screen + vs in-app −) with the business owner. Record each answer through `/ddd delta`.
   - Partial: the use case exists and is tested, but Q3 and Q4 are still `deferred` in `docs/domain/decisions.md`.
 - [x] `RemoveFrame` (−, or Undo on a prompt)
 - [x] `PauseMatch` and `ResumeMatch` (in the app or on the lock screen)
-- [ ] `OverrideMatchColour`: policy on `MatchStarted` when the sides share a colour and the Scorer accepts
-  - Partial: only the domain method `Match.overrideColour` exists. There is no use case, policy or test.
+- [x] `OverrideMatchColour`: policy on `MatchStarted` when the sides share a colour and the Scorer accepts
+  - Done (2026-10-06): `MatchCommands.overrideMatchColour`; the "policy" is the read model's `coloursClash` flag driving the live screen's prompt (the Scorer must accept, so no automatic reaction). The view picks a random palette colour. Tests: `sharedColoursAreFlaggedAndATemporaryColourChangesOnlyThisMatch`, `theColourCanOnlyBeOverriddenBeforeTheBreakerIsChosen`.
 - [x] Every use case follows load → mutate → save → dispatch
 
 ## UI (design language: 022)
@@ -47,14 +47,14 @@ Command-side use cases for starting and playing a match. Source: `docs/ddd-requi
   - Game, and players from `PlayerSuggestions` with inline add (011)
   - Style and targets as "race to" or "best of", odd numbers only
   - Break rule, with defaults from 007
-- [ ] **Start outcomes:**
-  - Partial: the limit refusal throws `liveMatchLimitReached`, but there is no alert linking to Settings, no "already live" confirmation and no colour-clash prompt.
+- [x] **Start outcomes:**
+  - Done (2026-10-06): New Game shows a "Live match limit reached" alert whose Change Limit opens the match settings (`MatchDefaultsSection`) in a sheet; a "… is already in a live match. Start another?" dialog; the live screen shows a "Same colour" alert while `coloursClash`. New Game also offers the sets style.
   - The live-match limit refusal is an alert that explains the limit and links to Settings
   - The "already in a live match?" confirmation
   - The colour clash (S46) is a confirmation offering a temporary colour
 - [x] **Choose breaker:** tap a player, then the live screen opens
-- [ ] **Live screen controls:**
-  - Partial: + and − with haptics, Pause/Resume in the toolbar and the disabled states are built. The Correct breaker item in the menu is missing.
+- [x] **Live screen controls:**
+  - Done (2026-10-06): ⋯ › Correct Breaker lists "X is breaking" per player, enabled from `controls.correctBreaker`.
   - Per player, a large **+** and a smaller, secondary **−**, both with haptics
   - Pause and Resume in the toolbar; Correct breaker in the ⋯ menu
   - Disabled when there is no breaker, when paused, and − at 0
@@ -87,6 +87,11 @@ Command-side use cases for starting and playing a match. Source: `docs/ddd-requi
   - Lock-screen wiring (018).
   - Recording Q3 and resolving or re-deferring Q4 in `docs/domain/decisions.md`.
   - Tests for correct breaker, override colour and "already live".
+
+## Progress (2026-10-06, live screen and start outcomes)
+- Built `correctBreaker`, `overrideMatchColour`, `playersAlreadyLive`, the start-outcome prompts, the Correct Breaker menu and the sets style in New Game (app-layer `MatchStyle.sets(sets:frames:)`, both targets as race-to).
+- Q3 for Continue?: the prompt is modal, so + waits for Continue or Undo, in line with the Finish? decision. Still to record in `docs/domain/decisions.md`, with Q4.
+- Remains: lock-screen wiring (018); Q3/Q4 in `decisions.md`.
 
 ## Progress (2026-10-06)
 - Verified: nothing new to tick. `startMatch` (limit only), `chooseBreaker`, `awardFrame`, `removeFrame`, pause, resume and the load, mutate, save, dispatch shape are as audited. Open items are annotated above: no `correctBreaker` or `overrideColour` use case, no `IsPlayerInLiveMatch` call, and Q3/Q4 are still deferred in `docs/domain/decisions.md`.

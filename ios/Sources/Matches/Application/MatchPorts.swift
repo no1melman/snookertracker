@@ -30,7 +30,16 @@ import Foundation
 @MainActor public protocol MatchCommands: AnyObject, Sendable {
     @discardableResult
     func startMatch(_ setup: MatchSetup) throws -> MatchID
+    /// Asked before `startMatch` (S11, `IsPlayerInLiveMatch`): the setup's players who are already in
+    /// a live match, so the UI can ask "are you sure?". Empty means start straight away.
+    func playersAlreadyLive(_ setup: MatchSetup) throws -> [MatchPlayer]
     func chooseBreaker(_ match: MatchID, player: PlayerRef) throws
+    /// `CorrectBreaker` (S41): `player` is breaking now; the break rule carries on from them.
+    /// In play or paused, once a breaker has been chosen.
+    func correctBreaker(_ match: MatchID, player: PlayerRef) throws
+    /// `OverrideMatchColour` (S46): gives `player` the palette colour `colour` for this match only,
+    /// when both sides share a colour and no breaker is chosen yet. Saved player colours don't change.
+    func overrideMatchColour(_ match: MatchID, of player: PlayerRef, to colour: String) throws
     func awardFrame(_ match: MatchID, to player: PlayerRef) throws
     func removeFrame(_ match: MatchID, from player: PlayerRef) throws
     func pauseMatch(_ match: MatchID) throws

@@ -13,19 +13,27 @@ public enum Game: String, CaseIterable, Hashable, Sendable {
     public var title: String { self == .pool ? "Pool" : "Snooker" }
 }
 
-/// Style with targets as entered: "race to" or "best of" (odd numbers only), or most frames wins.
+/// Style with targets as entered: "race to" or "best of" (odd numbers only), most frames wins, or
+/// sets (S16): race to `sets` sets, each set a race to `frames` frames.
 public enum MatchStyle: Hashable, Sendable {
     case mostFramesWins
     case raceTo(Int)
     case bestOf(Int)
+    case sets(sets: Int, frames: Int)
 
-    /// Frames a player needs to win, or nil when the match only ends by Finish.
+    /// Frames a player needs to win the match, or nil when the match only ends by Finish or is
+    /// decided in sets.
     public var framesToWin: Int? {
         switch self {
-        case .mostFramesWins: nil
+        case .mostFramesWins, .sets: nil
         case .raceTo(let n): n
         case .bestOf(let n): n / 2 + 1
         }
+    }
+
+    public var isSets: Bool {
+        if case .sets = self { return true }
+        return false
     }
 
     public var title: String {
@@ -33,6 +41,7 @@ public enum MatchStyle: Hashable, Sendable {
         case .mostFramesWins: "Most frames wins"
         case .raceTo(let n): "Race to \(n)"
         case .bestOf(let n): "Best of \(n)"
+        case .sets(let sets, let frames): "Race to \(sets) \(sets == 1 ? "set" : "sets") of \(frames)"
         }
     }
 
@@ -41,6 +50,7 @@ public enum MatchStyle: Hashable, Sendable {
         case .mostFramesWins: true
         case .raceTo(let n): n >= 1
         case .bestOf(let n): n >= 1 && n % 2 == 1
+        case .sets(let sets, let frames): sets >= 1 && frames >= 1
         }
     }
 }

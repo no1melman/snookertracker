@@ -31,8 +31,7 @@ extension MatchStyle {
         case .mostFramesWins: self = .mostFramesWins
         case .raceTo(let t):
             if case .bestOf(let m) = t.entry { self = .bestOf(m) } else { self = .raceTo(t.value) }
-        // Not offered by the UI yet; shown by its sets target.
-        case .sets(let sets, _): self = .raceTo(sets.value)
+        case .sets(let sets, let frames): self = .sets(sets: sets.value, frames: frames.value)
         }
     }
 
@@ -46,6 +45,10 @@ extension MatchStyle {
         case .bestOf(let m):
             guard case .success(let t) = Target.bestOf(m) else { throw MatchCommandError.invalidTargets }
             return .raceTo(t)
+        case .sets(let sets, let frames):
+            guard case .success(let s) = Target.raceTo(sets), case .success(let f) = Target.raceTo(frames)
+            else { throw MatchCommandError.invalidTargets }
+            return .sets(sets: s, frames: f)
         }
     }
 }

@@ -17,6 +17,11 @@ public struct NewGameView: View {
     @State private var newName = ""
     @State private var error: String?
     @State private var loaded = false
+    /// Waiting on "already in a live match?" (S11).
+    @State private var alreadyLive: AlreadyLive?
+    /// The live-match limit that refused the start (S44).
+    @State private var limitReached: Int?
+    @State private var showsLimitSetting = false
 
     public init(onStart: @escaping (MatchID) -> Void) {
         self.onStart = onStart
@@ -108,6 +113,43 @@ public struct NewGameView: View {
         .navigationTitle("New Game")
         .errorAlert($error)
         .onAppear(perform: loadDefaults)
+        .confirmationDialog(
+            alreadyLive.map(Self.alreadyLiveTitle) ?? "",
+            isPresented: Binding(get: { alreadyLive != nil }, set: { if !$0 { alreadyLive = nil } }),
+            titleVisibility: .visible, presenting: alreadyLive
+        ) { pending in
+            Button("Start Anyway") { confirmedStart(pending.setup) }
+            Button("Don't Start", role: .cancel) {}
+        } message: { _ in
+            Text("Both matches stay live, with their own timers.")
+        }
+        .alert("Live match limit reached", isPresented: Binding(get: { limitReached != nil }, set: { if !$0 { limitReached = nil } })) {
+            Button("Change Limit") { showsLimitSetting = true }
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("You already have \(limitReached ?? 0) live matches. Finish one, or raise the limit in Settings.")
+        }
+        .sheet(isPresented: $showsLimitSetting) {
+            NavigationStack {
+                Form { MatchDefaultsSection() }
+                    .navigationTitle("Settings")
+                    .inlineTitle()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) { Button("Done") { showsLimitSetting = false } }
+                    }
+            }
+        }
+    }
+
+    struct AlreadyLive {
+        let setup: MatchSetup
+        let players: [MatchPlayer]
+    }
+
+    static func alreadyLiveTitle(_ pending: AlreadyLive) -> String {
+        let names = pending.players.map(\.name)
+        let who = names.count > 1 ? names.joined(separator: " and ") + " are" : (names.first ?? "") + " is"
+        return "\(who) already in a live match. Start another?"
     }
 
     private func loadDefaults() {
@@ -141,11 +183,24 @@ public struct NewGameView: View {
         start(MatchSetup(players: selected, game: game, style: style, breakRule: breakRule))
     }
 
+    /// S11: a player already in a live match can play another after "are you sure?".
     private func start(_ setup: MatchSetup) {
         guard let ports else { return }
         attempt($error) {
-            let id = try ports.commands.startMatch(setup)
-            onStart(id)
+            let live = try ports.commands.playersAlreadyLive(setup)
+            if live.isEmpty { confirmedStart(setup) } else { alreadyLive = AlreadyLive(setup: setup, players: live) }
+        }
+    }
+
+    /// The live-match limit refusal (S44) explains itself and offers the limit setting.
+    private func confirmedStart(_ setup: MatchSetup) {
+        guard let ports else { return }
+        do {
+            onStart(try ports.commands.startMatch(setup))
+        } catch MatchCommandError.liveMatchLimitReached(let limit) {
+            limitReached = limit
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 
@@ -226,7 +281,9 @@ public struct MatchStyleEditor: View {
         _style = style
     }
 
-    private enum Kind: String, CaseIterable { case most = "Most frames wins", race = "Race to", best = "Best of" }
+    private enum Kind: String, CaseIterable {
+        case most = "Most frames wins", race = "Race to", best = "Best of", sets = "Sets"
+    }
 
     private var kind: Binding<Kind> {
         Binding {
@@ -234,12 +291,14 @@ public struct MatchStyleEditor: View {
             case .mostFramesWins: .most
             case .raceTo: .race
             case .bestOf: .best
+            case .sets: .sets
             }
         } set: { kind in
             switch kind {
             case .most: style = .mostFramesWins
             case .race: style = .raceTo(target ?? 3)
             case .best: style = .bestOf(target.map { $0 * 2 - 1 } ?? 5)
+            case .sets: style = .sets(sets: 2, frames: target ?? 3)
             }
         }
     }
@@ -261,6 +320,13 @@ public struct MatchStyleEditor: View {
         case .bestOf(let n):
             Stepper(value: Binding { n } set: { style = .bestOf($0) }, in: 1...59, step: 2) {
                 LabeledContent("Best of", value: "\(n)").monospacedDigit()
+            }
+        case .sets(let sets, let frames):
+            Stepper(value: Binding { sets } set: { style = .sets(sets: $0, frames: frames) }, in: 1...15) {
+                LabeledContent("Race to sets", value: "\(sets)").monospacedDigit()
+            }
+            Stepper(value: Binding { frames } set: { style = .sets(sets: sets, frames: $0) }, in: 1...30) {
+                LabeledContent("Frames per set", value: "Race to \(frames)").monospacedDigit()
             }
         }
     }

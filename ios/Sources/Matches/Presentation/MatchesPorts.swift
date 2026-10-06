@@ -11,11 +11,14 @@ public struct MatchesPorts: Sendable {
     /// `TemplateList` and `DeleteTemplate` (spec 008); nil shows New Game without templates.
     public let templates: (any TemplateListQuery)?
     public let templateCommands: (any TemplateCommands)?
+    /// Stats' `HeadToHead` (S14) for the live screen's strip; nil hides the strip.
+    public let headToHead: HeadToHeadLookup?
 
     public init(
         live: any LiveMatchesQuery, screens: any LiveMatchScreenQuery, commands: any MatchCommands,
         settings: any MatchSettings, players: any MatchPlayerDirectory,
-        templates: (any TemplateListQuery)? = nil, templateCommands: (any TemplateCommands)? = nil
+        templates: (any TemplateListQuery)? = nil, templateCommands: (any TemplateCommands)? = nil,
+        headToHead: HeadToHeadLookup? = nil
     ) {
         self.live = live
         self.screens = screens
@@ -24,6 +27,7 @@ public struct MatchesPorts: Sendable {
         self.players = players
         self.templates = templates
         self.templateCommands = templateCommands
+        self.headToHead = headToHead
     }
 }
 
@@ -37,7 +41,5 @@ public enum MatchRoute: Hashable {
     case live(MatchID)
 }
 
-/// VoiceOver score: "Asher 4, Me 3".
-func spokenScore(_ sides: [LiveSide]) -> String {
-    sides.map { "\($0.name) \($0.frames)" }.joined(separator: ", ")
-}
+/// VoiceOver score: "Asher 4, Me 3" (sets: "Asher 2 (1 set), Me 0 (0 sets)").
+func spokenScore(_ sides: [LiveSide]) -> String { spokenLiveScore(sides) }
