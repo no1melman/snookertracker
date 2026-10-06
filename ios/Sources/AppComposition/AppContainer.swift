@@ -27,6 +27,8 @@ final class AppContainer {
     let lifecycle: AppLifecycle
     let matchRecords: MatchRecordsProjection
     private let directory: PlayersForMatches
+    /// Matches' reactions to Players' events (spec 011). Held here: their subscriptions are weak.
+    private var playerPolicies: [AnyObject] = []
     let dispatcher = EventDispatcher()
 
     private convenience init() {
@@ -65,6 +67,19 @@ final class AppContainer {
         templateCommands = TemplateUseCases(repository: templateRepository, list: templateList)
         templateCommands.subscribe(to: dispatcher)
         try templateCommands.loadTemplates()
+        // Spec 011: Matches reacts to PlayerRemoved / PlayersMerged / PlayerArchived, and answers
+        // Players' open-host questions (archive and merge guards, how many matches a removal deletes).
+        let deleteMatches = DeleteMatchesOnPlayerRemoved(matches: matchCommands)
+        let deleteTemplates = DeleteTemplatesOnPlayerRemoved(templates: templateCommands)
+        let combineTemplates = CombineTemplatesAfterMerge(templates: templateCommands)
+        let hideArchived = HideArchivedPlayersTemplates(list: templateList)
+        deleteMatches.subscribe(to: dispatcher)
+        deleteTemplates.subscribe(to: dispatcher)
+        combineTemplates.subscribe(to: dispatcher)
+        hideArchived.subscribe(to: dispatcher)
+        playerPolicies = [deleteMatches, deleteTemplates, combineTemplates, hideArchived]
+        templateList.seedArchived(players.players.filter(\.isArchived).map(\.id))
+        players.matchQueries = MatchesForPlayers(matches: matchCommands)
         // S27 before anything reads live matches; then the stale check (S28) once Stats exists.
         try AppLaunchSequence(lifecycle: lifecycle, matches: matchCommands, afterAutoPause: [
             // TODO(spec 020, S28): FlagStaleMatches + stale prompt, when Stats (specs 014/015) lands.
@@ -86,6 +101,30 @@ final class AppContainer {
     var matchesPorts: MatchesPorts {
         MatchesPorts(live: liveMatches, screens: liveMatches, commands: matchCommands, settings: matchSettings,
                      players: directory, templates: templateList, templateCommands: templateCommands)
+    }
+
+    /// History match detail: Edit score, Mark finished, Delete (spec 015).
+    var matchDetailActions: MatchDetailActions {
+        MatchDetailActions(
+            correctScore: { [matchCommands] id, edit, confirmed in
+                let score: CorrectedScore = switch edit {
+                case .frames(let p): .frames(first: p.first, second: p.second)
+                case .sets(let sets): .sets(sets.map { SetScore(first: $0.first, second: $0.second) })
+                }
+                do {
+                    try matchCommands.correctMatchScore(id, to: score, confirmed: confirmed)
+                    return []
+                } catch MatchCommandError.correctionNeedsConfirmation(let warnings) {
+                    return warnings
+                }
+            },
+            markFinished: { [matchCommands] in try matchCommands.markMatchFinished($0) },
+            delete: { [matchCommands] in try matchCommands.deleteMatch($0) })
+    }
+
+    /// New Game's swipe to archive (ADR-0008), adapted from Players.
+    var archivePlayer: ArchivePlayerAction {
+        { [players] id in try players.archivePlayer(id) }
     }
 
     var statsPorts: StatsPorts {

@@ -25,6 +25,8 @@ public struct AppRoot: View {
             .environment(\.matchesPorts, container.matchesPorts)
             .environment(\.playersPorts, container.playersPorts)
             .environment(\.statsPorts, container.statsPorts)
+            .environment(\.matchDetailActions, container.matchDetailActions)
+            .environment(\.archivePlayer, container.archivePlayer)
             .recordsAppLifecycle(container.lifecycle)
             #if os(iOS)
             .fullScreenCover(isPresented: .constant(needsWelcome)) {
