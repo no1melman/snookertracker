@@ -67,7 +67,8 @@ struct HubView: View {
                 case .settings: SettingsView()
                 case .me: MeView()
                 case .history: HistoryView()
-                default: PlaceholderScreen(title: destination.title)
+                case .stats: StatsView()
+                case .series: SeriesView()
                 }
             }
             .navigationDestination(for: StatsRoute.self) { route in
@@ -86,6 +87,8 @@ struct HubView: View {
         case "players": path.append(HubDestination.players)
         case "settings": path.append(HubDestination.settings)
         case "history": path.append(HubDestination.history)
+        case "stats": path.append(HubDestination.stats)
+        case "series": path.append(HubDestination.series)
         case "match":
             path.append(HubDestination.history)
             if let id = stats?.history.pastMatches(PastMatchesFilter()).first?.id { path.append(StatsRoute.match(id)) }
@@ -129,14 +132,5 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
-    }
-}
-
-struct PlaceholderScreen: View {
-    let title: String
-
-    var body: some View {
-        ContentUnavailableView(title, systemImage: "hammer", description: Text("Coming soon. Matches you finish are kept for when this lands."))
-            .navigationTitle(title)
     }
 }

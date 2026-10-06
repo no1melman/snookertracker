@@ -15,13 +15,16 @@ import PlayersPublished
 @MainActor @Observable
 public final class MatchRecordsProjection: MatchHistoryQuery {
     @ObservationIgnored private let store: any StatsStore
-    private var records: [UUID: MatchRecord] = [:]
-    private var players: [UUID: StatsPlayer] = [:]
+    private(set) var records: [UUID: MatchRecord] = [:]
+    private(set) var players: [UUID: StatsPlayer] = [:]
     /// The last projection failure (logged, never thrown into a Matches or Players command).
     @ObservationIgnored public private(set) var lastError: (any Error)?
+    /// Weekdays (S19, S28) are read from a match's start time in this calendar.
+    @ObservationIgnored let calendar: Calendar
 
-    public init(store: any StatsStore) throws {
+    public init(store: any StatsStore, calendar: Calendar = .current) throws {
         self.store = store
+        self.calendar = calendar
         records = Dictionary(uniqueKeysWithValues: try store.allRecords().map { ($0.id, $0) })
         players = Dictionary(uniqueKeysWithValues: try store.allPlayers().map { ($0.id, $0) })
     }
@@ -176,7 +179,7 @@ public final class MatchRecordsProjection: MatchHistoryQuery {
     }
 
     /// The player shown for a side: merges followed to the kept player; current name and colour.
-    private func resolve(_ side: MatchRecord.Side) -> (player: StatsPlayer, view: HistoryPlayer) {
+    func resolve(_ side: MatchRecord.Side) -> (player: StatsPlayer, view: HistoryPlayer) {
         var p = players[side.player] ?? StatsPlayer(id: side.player, name: "Unknown player", colour: side.colour)
         var hops = 0
         while let next = p.mergedInto, let kept = players[next], hops < 16 { p = kept; hops += 1 }
@@ -198,7 +201,7 @@ public final class MatchRecordsProjection: MatchHistoryQuery {
             winner: winner, isDraw: status == .finished && r.result == .draw, isAltered: r.isAltered)
     }
 
-    private static func line(_ s: MatchRecord.Score) -> ScoreLine {
+    static func line(_ s: MatchRecord.Score) -> ScoreLine {
         ScoreLine(first: s.first, second: s.second, firstSets: s.firstSets, secondSets: s.secondSets)
     }
 

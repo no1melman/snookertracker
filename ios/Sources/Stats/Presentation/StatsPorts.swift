@@ -6,10 +6,19 @@ public struct StatsPorts: Sendable {
     public let history: any MatchHistoryQuery
     /// Matches' `DeleteMatch` (S30), adapted by the composition root; nil hides delete.
     public let deleteMatch: (@MainActor @Sendable (UUID) throws -> Void)?
+    /// `Stats(filter)` (spec 014); nil shows the Stats screen as unavailable.
+    public let stats: (any StatsQuery)?
+    /// Players' `WhoAmI`: the default point of view; nil (or returning nil) asks for a player.
+    public let me: (@MainActor @Sendable () -> UUID?)?
 
-    public init(history: any MatchHistoryQuery, deleteMatch: (@MainActor @Sendable (UUID) throws -> Void)? = nil) {
+    public init(
+        history: any MatchHistoryQuery, deleteMatch: (@MainActor @Sendable (UUID) throws -> Void)? = nil,
+        stats: (any StatsQuery)? = nil, me: (@MainActor @Sendable () -> UUID?)? = nil
+    ) {
         self.history = history
         self.deleteMatch = deleteMatch
+        self.stats = stats
+        self.me = me
     }
 }
 

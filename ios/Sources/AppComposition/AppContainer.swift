@@ -26,6 +26,8 @@ final class AppContainer {
     let templateCommands: TemplateUseCases
     let lifecycle: AppLifecycle
     let matchRecords: MatchRecordsProjection
+    let seriesList: SeriesListProjection
+    let seriesCommands: SeriesUseCases
     private let directory: PlayersForMatches
     /// Matches' reactions to Players' events (spec 011). Held here: their subscriptions are weak.
     private var playerPolicies: [AnyObject] = []
@@ -52,8 +54,17 @@ final class AppContainer {
         let store = try SQLiteMatchEventStore(db: db, originDevice: DeviceIdentity.id(in: db))
         // Stats (spec 013): subscribe before any command can dispatch, then catch up on everything
         // Matches published before Stats existed (or since it last ran), via Matches' open host replay.
-        matchRecords = try MatchRecordsProjection(store: SQLiteStatsStore(db: db))
+        let statsStore = try SQLiteStatsStore(db: db)
+        matchRecords = try MatchRecordsProjection(store: statsStore)
         matchRecords.subscribe(to: dispatcher)
+        // Series (spec 016) lives in Stats: subscribed after the records, so player names are current
+        // before the series list refreshes on a merge or removal.
+        let seriesRepository = try SQLiteSeriesRepository(db: db)
+        seriesList = SeriesListProjection(
+            reader: seriesRepository, catalog: StatsStoreSetupCatalog(records: statsStore, players: statsStore))
+        seriesCommands = SeriesUseCases(repository: seriesRepository, list: seriesList)
+        seriesCommands.subscribe(to: dispatcher)
+        try seriesCommands.loadSeries()
         try matchRecords.seedPlayers(players.players.map {
             StatsPlayer(id: $0.id, name: $0.name, colour: $0.colour, isArchived: $0.isArchived)
         })
@@ -103,6 +114,8 @@ final class AppContainer {
                      players: directory, templates: templateList, templateCommands: templateCommands)
     }
 
+    var seriesPorts: SeriesPorts { SeriesPorts(list: seriesList, commands: seriesCommands) }
+
     /// History match detail: Edit score, Mark finished, Delete (spec 015).
     var matchDetailActions: MatchDetailActions {
         MatchDetailActions(
@@ -128,7 +141,9 @@ final class AppContainer {
     }
 
     var statsPorts: StatsPorts {
-        StatsPorts(history: matchRecords, deleteMatch: { [matchCommands] in try matchCommands.deleteMatch($0) })
+        StatsPorts(
+            history: matchRecords, deleteMatch: { [matchCommands] in try matchCommands.deleteMatch($0) },
+            stats: matchRecords, me: { [players] in players.me?.id })
     }
 }
 

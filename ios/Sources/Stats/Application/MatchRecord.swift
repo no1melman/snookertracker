@@ -10,6 +10,10 @@ public struct MatchRecord: Codable, Hashable, Sendable, Identifiable {
         public let raceTo: Int
         /// Set when entered as "best of".
         public let bestOf: Int?
+
+        public init(raceTo: Int, bestOf: Int? = nil) {
+            self.raceTo = raceTo; self.bestOf = bestOf
+        }
     }
 
     public enum Style: Codable, Hashable, Sendable {
