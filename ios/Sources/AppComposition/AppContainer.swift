@@ -12,6 +12,7 @@ import SQLiteSupport
 import StatsApplication
 import StatsInfrastructure
 import StatsPresentation
+import StatsPublished
 #if canImport(UserNotifications)
 import UserNotifications
 #endif
@@ -39,6 +40,9 @@ final class AppContainer {
     let matchRecords: MatchRecordsProjection
     let seriesList: SeriesListProjection
     let seriesCommands: SeriesUseCases
+    let monthlySummaries: MonthlySummaryProjection
+    /// S38: run at launch and on every return to the foreground; each month is issued once.
+    let issueSummaries: IssueMonthlySummaries
     private let directory: PlayersForMatches
     /// Matches' reactions to Players' events (spec 011). Held here: their subscriptions are weak.
     private var playerPolicies: [AnyObject] = []
@@ -76,6 +80,11 @@ final class AppContainer {
         seriesCommands = SeriesUseCases(repository: seriesRepository, list: seriesList)
         seriesCommands.subscribe(to: dispatcher)
         try seriesCommands.loadSeries()
+        monthlySummaries = MonthlySummaryProjection(
+            stats: matchRecords, series: seriesRepository, me: { [players] in players.me?.id })
+        issueSummaries = IssueMonthlySummaries(
+            repository: seriesRepository, summaries: monthlySummaries,
+            log: try SQLiteSeriesSummaryLog(db: db), dispatcher: dispatcher)
         try matchRecords.seedPlayers(players.players.map {
             StatsPlayer(id: $0.id, name: $0.name, colour: $0.colour, isArchived: $0.isArchived)
         })
@@ -119,6 +128,8 @@ final class AppContainer {
         try matchCommands.loadLiveMatches()
         warnLongFrame.rescheduleAll()
         askForNotificationsOnFirstMatch()
+        deliverSeriesSummaries()
+        issueSummaries.run()
         #if DEBUG
         seedDemoIfRequested()
         #endif
@@ -140,6 +151,17 @@ final class AppContainer {
         #endif
     }
 
+    /// A monthly series summary arrives as a notification on the 1st (spec 019).
+    private func deliverSeriesSummaries() {
+        #if canImport(UserNotifications)
+        dispatcher.subscribe(SeriesSummaryIssuedPublished.self) { [notifications] e in
+            notifications.deliver(
+                title: e.seriesName, body: e.text, at: e.occurredAt,
+                id: "series-summary.\(e.seriesId).\(e.year)-\(e.month)")
+        }
+        #endif
+    }
+
     /// Application Support/SnookerTracker/SnookerTracker.sqlite
     static var databaseURL: URL {
         URL.applicationSupportDirectory.appending(path: "SnookerTracker", directoryHint: .isDirectory)
@@ -153,7 +175,9 @@ final class AppContainer {
                      players: directory, templates: templateList, templateCommands: templateCommands)
     }
 
-    var seriesPorts: SeriesPorts { SeriesPorts(list: seriesList, commands: seriesCommands) }
+    var seriesPorts: SeriesPorts {
+        SeriesPorts(list: seriesList, commands: seriesCommands, summaries: monthlySummaries)
+    }
 
     /// History match detail: Edit score, Mark finished, Delete (spec 015).
     var matchDetailActions: MatchDetailActions {

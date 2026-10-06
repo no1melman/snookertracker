@@ -6,10 +6,13 @@ import SwiftUI
 public struct SeriesPorts: Sendable {
     public let list: any SeriesListQuery
     public let commands: any SeriesCommands
+    /// `MonthlySummary(series, month)` (spec 017); nil hides the summary button on each row.
+    public let summaries: (any MonthlySummaryQuery)?
 
-    public init(list: any SeriesListQuery, commands: any SeriesCommands) {
+    public init(list: any SeriesListQuery, commands: any SeriesCommands, summaries: (any MonthlySummaryQuery)? = nil) {
         self.list = list
         self.commands = commands
+        self.summaries = summaries
     }
 }
 
@@ -18,10 +21,12 @@ public extension EnvironmentValues {
 }
 
 /// The Series screen (spec 016), from `SeriesList`: tap a series to edit it in a sheet, + to create
-/// one, swipe to delete (icon-only) with a confirmation that its matches are kept.
+/// one, swipe to delete (icon-only) with a confirmation that its matches are kept. The chart button
+/// on a row opens its monthly summary (spec 017).
 public struct SeriesView: View {
     @Environment(\.seriesPorts) private var ports
     @State private var editing: SeriesDraft?
+    @State private var summaryFor: UUID?
     @State private var deleting: SeriesRow?
     @State private var error: String?
 
@@ -41,9 +46,19 @@ public struct SeriesView: View {
             } else {
                 List {
                     ForEach(rows) { row in
-                        Button { editing = SeriesDraft(row) } label: { SeriesRowView(row: row) }
-                            .tint(.primary)
-                            .swipeActions {
+                        HStack(spacing: 8) {
+                            Button { editing = SeriesDraft(row) } label: { SeriesRowView(row: row) }
+                                .tint(.primary)
+                                .buttonStyle(.borderless)
+                            if ports?.summaries != nil {
+                                Button("Monthly Summary", systemImage: "chart.bar.doc.horizontal") { summaryFor = row.id }
+                                    .labelStyle(.iconOnly)
+                                    .buttonStyle(.borderless)
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .accessibilityHint("Shows last month for \(row.name)")
+                            }
+                        }
+                        .swipeActions {
                                 Button("Delete", systemImage: "trash", role: .destructive) { deleting = row }
                                     .labelStyle(.iconOnly)
                             }
@@ -58,6 +73,9 @@ public struct SeriesView: View {
             }
         }
         .onAppear { ports?.list.refresh() }
+        .navigationDestination(item: $summaryFor) { id in
+            MonthlySummaryView(series: id)
+        }
         .sheet(item: $editing) { draft in
             SeriesEditor(draft: draft)
         }

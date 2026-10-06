@@ -8,6 +8,7 @@ import SwiftUI
 /// The app's root view: wires the ports into the environment and shows Welcome until Me exists.
 public struct AppRoot: View {
     @State private var container = AppContainer.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     public init() {}
 
@@ -30,6 +31,9 @@ public struct AppRoot: View {
             .environment(\.archivePlayer, container.archivePlayer)
             .recordsAppLifecycle(container.lifecycle)
             .stalePrompt(needsWelcome ? nil : container.staleMatches)
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { container.issueSummaries.run() }
+            }
             #if os(iOS)
             .fullScreenCover(isPresented: .constant(needsWelcome)) {
                 WelcomeView().environment(\.playersPorts, container.playersPorts)
