@@ -26,9 +26,12 @@ Matches query side: live-match views and the open-host queries that Players call
   - Day + time, sides with colours, score (sets format), breaker dot
   - Match timer, frame timer, paused, available controls
   - Head-to-head from Stats' `HeadToHead` OHS (inject the protocol, so it can be stubbed until Stats lands)
-- [ ] `LockScreenState`: the oldest live match (as `findLive`), or none: match id, sides, score, breaker, frame timer, paused (Q4 noted). Moves to the next-oldest when the shown match ends (ADR-0004).
+  - Partial: day and time, timers, breaker and controls are built. Missing: the sets score format and the `HeadToHead` field (the model says "Head-to-head is not provided yet").
+- [x] `LockScreenState`: the oldest live match (as `findLive`), or none: match id, sides, score, breaker, frame timer, paused (Q4 noted). Moves to the next-oldest when the shown match ends (ADR-0004).
 - [ ] OHS `IsPlayerInLiveMatch(PlayerId)`: used by Players' archive guard and the "are you sure" check on start
+  - Partial: the protocol `PlayerMatchQueries.isPlayerInLiveMatch` is published in `MatchesPublished`, but nothing implements, wires or tests it yet.
 - [ ] OHS `HavePlayedEachOther(PlayerId, PlayerId)`: used by Players' merge guard
+  - Partial: the protocol `PlayerMatchQueries.havePlayedEachOther` is published, but nothing implements, wires or tests it yet.
 - [x] Projections are kept current from the match event stream
 
 ## UI (design language: 022)
@@ -36,12 +39,14 @@ Matches query side: live-match views and the open-host queries that Players call
   - Oldest first, one row per match: both colour plates and names, the score in monospaced digits, a running match timer, and a Paused label
   - Tapping a row opens the live screen. The section is hidden when there are no live matches.
 - [ ] The **live screen**, from `LiveMatchScreen`:
+  - Partial: columns, breaker dot, timers, day and time, and controls are built. The head-to-head strip is missing.
   - Two player columns, each with a colour plate, name and huge frame count; a dot marks the breaker
   - Frame timer, match timer, and day and time are secondary
   - A head-to-head strip underneath, hidden when the players have no history
   - Controls are enabled from "available controls"
 - [x] **Paused:** a clear Paused state, timers frozen, and every control except Resume disabled
 - [ ] **VoiceOver** reads the score as "Asher 4, Me 3", plus the breaker and the paused state. At accessibility Dynamic Type sizes the score stays legible.
+  - Partial: each column reads "Asher 4, to break" separately, not one "Asher 4, Me 3". The paused state is not spoken on the live screen. The hub row does read the score as specified.
 
 ## Non-goals
 - Past-match lists and stats (Stats context)
@@ -66,3 +71,6 @@ Matches query side: live-match views and the open-host queries that Players call
   - The `IsPlayerInLiveMatch` and `HavePlayedEachOther` OHS in `MatchesPublished`.
   - VoiceOver reads the live screen per column, not "Asher 4, Me 3". The hub row does read it that way.
   - Integration tests for the sets format and the lock-screen hand-over.
+
+## Progress (2026-10-06)
+- Verified: `LockScreenState` (`LockScreenState.swift`, a view over `LiveMatchesProjection`) is built, with `LockScreenStateTests` covering none, oldest, a later match not replacing it, paused, hand-over to the next-oldest on finish, abandon and cancel, and a relaunch, so it is ticked. Still open: `LiveMatchScreen` (no sets format or head-to-head), the two OHS queries (protocol only), the live-screen head-to-head strip, and VoiceOver.

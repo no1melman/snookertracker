@@ -62,3 +62,6 @@ Stats projections of match history, built only from Matches' and Players' publis
 - Gaps: delete/correct/mark-finished actions wait for the 015 commands; read-model gaps from 022 (breaker per frame) are in `MatchTimeline` but not shown.
 
 **Implementation skills:** `ddd-cqrs`, `ddd-domain-events` · **Tests:** `ddd-testing`
+
+## Progress (2026-10-06)
+- Verified: every requirement and UI item was already ticked, and the code and tests are in place (`MatchRecordsTests` and the Stats integration tests, which pass in `swift test`). Nothing to change.

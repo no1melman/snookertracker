@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-10-05
 priority: medium
 tags:
@@ -9,7 +9,10 @@ depends_on:
 - '11'
 parent: '1'
 created_at: 2026-10-05T10:42:31.507618Z
-updated_at: 2026-10-05T10:42:31.507618Z
+updated_at: 2026-10-06T19:45:19.555405Z
+transitions:
+- status: in-progress
+  at: 2026-10-06T19:45:19.555405Z
 ---
 
 # Series

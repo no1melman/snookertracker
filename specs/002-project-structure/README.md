@@ -27,9 +27,10 @@ Set up the Swift module layout that every other spec builds into, and enforce th
   - Matches→Stats and Players→Stats: published language, conformist
   - Stats→Matches: OHS (`HeadToHead`, `AverageFrameTime`, `AverageMatchLength`)
 - [ ] An iOS anti-corruption layer lives in infrastructure (adapters for UserNotifications, ActivityKit + App Intents, app lifecycle)
+  - Partial: lifecycle (`AppLifecycle`) and ActivityKit (`ActivityKitLockScreenPresenter`) adapters exist in `iOSAdapters`, and the App Intents live in the widget target. There is no UserNotifications adapter yet.
 - [x] An in-process event dispatcher: after save, Stage 2 events reach their subscribers. Published event types are versioned.
 - [x] An iOS app target that composes the modules (composition root)
-- [ ] `swift build` and `swift test` run green in CI or locally
+- [x] `swift build` and `swift test` run green in CI or locally
 
 ## Non-goals
 - Any domain behaviour (covered by the context specs)
@@ -54,3 +55,6 @@ Set up the Swift module layout that every other spec builds into, and enforce th
   - `iOSAdapters` is only a placeholder module. The real adapters come with specs 018–020.
   - The OHS protocols themselves don't exist yet (`StatsPublished` is empty). They arrive with 009 and 014.
   - A green `swift build` / `swift test` wasn't verified in this audit, and there is no CI config.
+
+## Progress (2026-10-06)
+- Verified: `swift test` in `ios/` passes (264 tests, exit 0) on macOS, so the build and test item is ticked as run locally. There is still no CI config. `iOSAdapters` is no longer a placeholder (lifecycle and ActivityKit adapters). The OHS `PlayerMatchQueries` protocol now exists in `MatchesPublished`. The ACL item stays open because there is no UserNotifications adapter.

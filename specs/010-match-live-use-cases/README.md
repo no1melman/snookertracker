@@ -31,11 +31,15 @@ Command-side use cases for starting and playing a match. Source: `docs/ddd-requi
   - Enforces the live-match limit from `MatchSettings`
   - Asks "already in a live match?" (`IsPlayerInLiveMatch`)
   - Load settings → `Match.start` → save → dispatch
+  - Partial: limit check and load, start, save, dispatch are built and tested. Missing: the `IsPlayerInLiveMatch` check, and starting from a template.
 - [ ] `ChooseBreaker` and `CorrectBreaker` (from the match menu)
+  - Partial: `chooseBreaker` is built. The domain has `Match.correctBreaker`, but there is no use case, menu item or integration test.
 - [ ] `AwardFrame` (in the app or on the lock screen). **Resolve Q3** (+ while a Finish/Continue prompt shows) and **Q4** (lock-screen + vs in-app −) with the business owner. Record each answer through `/ddd delta`.
+  - Partial: the use case exists and is tested, but Q3 and Q4 are still `deferred` in `docs/domain/decisions.md`.
 - [x] `RemoveFrame` (−, or Undo on a prompt)
 - [x] `PauseMatch` and `ResumeMatch` (in the app or on the lock screen)
 - [ ] `OverrideMatchColour`: policy on `MatchStarted` when the sides share a colour and the Scorer accepts
+  - Partial: only the domain method `Match.overrideColour` exists. There is no use case, policy or test.
 - [x] Every use case follows load → mutate → save → dispatch
 
 ## UI (design language: 022)
@@ -44,11 +48,13 @@ Command-side use cases for starting and playing a match. Source: `docs/ddd-requi
   - Style and targets as "race to" or "best of", odd numbers only
   - Break rule, with defaults from 007
 - [ ] **Start outcomes:**
+  - Partial: the limit refusal throws `liveMatchLimitReached`, but there is no alert linking to Settings, no "already live" confirmation and no colour-clash prompt.
   - The live-match limit refusal is an alert that explains the limit and links to Settings
   - The "already in a live match?" confirmation
   - The colour clash (S46) is a confirmation offering a temporary colour
 - [x] **Choose breaker:** tap a player, then the live screen opens
 - [ ] **Live screen controls:**
+  - Partial: + and − with haptics, Pause/Resume in the toolbar and the disabled states are built. The Correct breaker item in the menu is missing.
   - Per player, a large **+** and a smaller, secondary **−**, both with haptics
   - Pause and Resume in the toolbar; Correct breaker in the ⋯ menu
   - Disabled when there is no breaker, when paused, and − at 0
@@ -81,3 +87,6 @@ Command-side use cases for starting and playing a match. Source: `docs/ddd-requi
   - Lock-screen wiring (018).
   - Recording Q3 and resolving or re-deferring Q4 in `docs/domain/decisions.md`.
   - Tests for correct breaker, override colour and "already live".
+
+## Progress (2026-10-06)
+- Verified: nothing new to tick. `startMatch` (limit only), `chooseBreaker`, `awardFrame`, `removeFrame`, pause, resume and the load, mutate, save, dispatch shape are as audited. Open items are annotated above: no `correctBreaker` or `overrideColour` use case, no `IsPlayerInLiveMatch` call, and Q3/Q4 are still deferred in `docs/domain/decisions.md`.
