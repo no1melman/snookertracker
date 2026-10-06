@@ -41,7 +41,7 @@ The Players context's `Player` aggregate end to end: domain, repository, use cas
   - `AddPlayer`: an archived name returns an error offering `RemovePlayer`
   - `RenamePlayer`, `ChangePlayerColour`
   - `MergePlayers`, `ArchivePlayer`, `UnarchivePlayer`
-  - `RemovePlayer`, with confirmation
+  - `RemovePlayer`: confirmation only when the player has matches. The count comes from Matches' `findByPlayer` through the composition root (ADR-0008).
 - [ ] Read models:
   - `PlayerSuggestions(prefix)`: id, name, colour; active players only, case-insensitive prefix
   - `PlayersList`: id, name, colour, status; active and archived sections
@@ -57,7 +57,9 @@ The Players context's `Player` aggregate end to end: domain, repository, use cas
 - [ ] The **Players** screen, from `PlayersList`:
   - Active and Archived sections. Each row shows a colour plate and name; archived rows are greyed.
   - Add from the toolbar
-  - Context actions: Rename, Colour (from the fixed palette, still an open decision in 022), Merge into…, Archive or Unarchive, and Remove (archived only, with confirmation)
+  - Context actions: Rename, Colour (from the fixed palette, still an open decision in 022), Merge into…, Archive or Unarchive, and Remove (archived only)
+  - Swipe (icon-only, ADR-0008): an active row → Archive, with no confirmation. An archived row → Remove, which asks first only when the player has matches and says how many will be deleted; with none, the player is removed at once.
+- [ ] The **New Game** player list: swipe an active player → Archive (ADR-0008)
 - [ ] **Refusals** explain themselves:
   - Adding an archived name offers Remove
   - A merge is refused when the two have played each other

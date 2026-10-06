@@ -34,7 +34,7 @@ updated_at: 2026-10-05T10:42:31.507618Z
 ## UI (design language: 022)
 - [ ] The **Series** screen, from `SeriesList`:
   - Create and edit in a sheet (name, choose setups)
-  - Delete with a confirmation stating that the matches are kept
+  - Delete by swiping a series row (icon-only action), with a confirmation stating that the matches are kept
 - [ ] The series filter appears in Stats (014)
 
 ## Non-goals

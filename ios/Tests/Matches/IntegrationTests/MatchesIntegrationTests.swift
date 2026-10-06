@@ -281,6 +281,27 @@ extension Result {
         #expect(throws: MatchCommandError.notAllowedNow) { try app.commands.awardFrame(a, to: callum) }
     }
 
+    @Test func anEndedMatchCanBeDeletedAndTheDeletionIsPublished() throws {
+        let app = try Stack.inMemory()
+        nonisolated(unsafe) var received: [String] = []
+        app.dispatcher.subscribe(MatchEventPublished.self) { received.append($0.type) }
+        let id = try app.commands.startMatch(setup())
+        try app.commands.abandonMatch(id)
+
+        try app.commands.deleteMatch(id)
+
+        #expect(try app.repository.getById(id)?.status == .deleted)
+        #expect(received.last == "MatchDeleted")
+        #expect(throws: MatchCommandError.notAllowedNow) { try app.commands.deleteMatch(id) }
+    }
+
+    @Test func aLiveMatchCannotBeDeleted() throws {
+        let app = try Stack.inMemory()
+        let id = try app.commands.startMatch(setup())
+        #expect(throws: MatchCommandError.notAllowedNow) { try app.commands.deleteMatch(id) }
+        #expect(app.readModel.liveMatches.count == 1)
+    }
+
     @Test func storedEventsArePublishedAfterTheSave() throws {
         let app = try Stack.inMemory()
         nonisolated(unsafe) var received: [MatchEventPublished] = []

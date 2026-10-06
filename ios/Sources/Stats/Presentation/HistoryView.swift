@@ -8,6 +8,8 @@ public struct HistoryView: View {
     @Environment(\.statsPorts) private var ports
     @AppStorage("history.showCancelled") private var showCancelled = false
     @AppStorage("history.includeArchived") private var includeArchived = false
+    @State private var deleting: PastMatchRow?
+    @State private var error: String?
 
     public init() {}
 
@@ -26,6 +28,12 @@ public struct HistoryView: View {
                         Section(month.title) {
                             ForEach(month.rows) { row in
                                 NavigationLink(value: StatsRoute.match(row.id)) { PastMatchRowView(row: row) }
+                                    .swipeActions {
+                                        if ports?.deleteMatch != nil {
+                                            Button("Delete", systemImage: "trash", role: .destructive) { deleting = row }
+                                                .labelStyle(.iconOnly)
+                                        }
+                                    }
                             }
                         }
                     }
@@ -33,6 +41,15 @@ public struct HistoryView: View {
             }
         }
         .navigationTitle("History")
+        .confirmationDialog("Delete this match?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+                            titleVisibility: .visible, presenting: deleting) { row in
+            Button("Delete Match", role: .destructive) {
+                attempt($error) { try ports?.deleteMatch?(row.id) }
+            }
+        } message: { row in
+            Text("\(HistoryFormat.spokenScore(row)) on \(HistoryFormat.dayAndTime(row.startedAt)) is removed from the history and stats. This can't be undone.")
+        }
+        .errorAlert($error)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {

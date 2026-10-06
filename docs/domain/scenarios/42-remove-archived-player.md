@@ -3,9 +3,9 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline), ADR-0008
 **Actor:** Scorer
-**Trigger / interface:** Settings → Players (archived) → remove; or offered when typing / renaming to an archived player's name (2, 3, 32). Confirmation dialog.
+**Trigger / interface:** Swipe an archived player on the Players screen (icon-only action); Settings → Players (archived) → remove; or offered when typing / renaming to an archived player's name (2, 3, 32). A confirmation dialog only when they have matches.
 **Description:** Permanently removes the player and all their matches. Their templates go, their setups are taken out of series, and the name becomes free.
 
 ## Relations
@@ -14,18 +14,19 @@
 - Depends on: [34]
 
 ## Inputs
-- Confirmation
+- Confirmation, when the player has matches (it states how many will be deleted)
 
 ## Rules
 - Only archived players
+- No matches → removed without a dialog; one or more matches → confirm first
 - If the player was "Me", Me is cleared
 
 ## Flow
-1. Scorer confirms removal
+1. Scorer removes the player, confirming if they have matches
 2. Player removed; reactions clean up
 
 ## Failure paths
-- Declined → nothing changes
+- Declined (when asked) → nothing changes
 
 ## Domain Events Raised
 - `PlayerRemoved`

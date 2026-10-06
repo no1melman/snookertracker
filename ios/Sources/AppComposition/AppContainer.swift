@@ -88,7 +88,9 @@ final class AppContainer {
                      players: directory, templates: templateList, templateCommands: templateCommands)
     }
 
-    var statsPorts: StatsPorts { StatsPorts(history: matchRecords) }
+    var statsPorts: StatsPorts {
+        StatsPorts(history: matchRecords, deleteMatch: { [matchCommands] in try matchCommands.deleteMatch($0) })
+    }
 }
 
 /// Customer/supplier adapter: Players as Matches sees it (`MatchPlayerDirectory`).

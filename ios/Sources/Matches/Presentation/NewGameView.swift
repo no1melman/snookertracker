@@ -31,6 +31,7 @@ public struct NewGameView: View {
                         TemplateRowButton(template: template) { start(template.setup) }
                             .swipeActions {
                                 Button("Delete", systemImage: "trash", role: .destructive) { delete(template) }
+                                    .labelStyle(.iconOnly)
                             }
                     }
                 }

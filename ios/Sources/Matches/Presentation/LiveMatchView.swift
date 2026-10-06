@@ -70,9 +70,9 @@ public struct LiveMatchView: View {
             }
         }
         .confirmationDialog(endTitle(screen), isPresented: Binding(get: { ending != nil }, set: { if !$0 { ending = nil } }), titleVisibility: .visible, presenting: ending) { action in
-            Button(endButton(action), role: action == .cancel ? .destructive : nil) { end(action, commands) }
+            Button(Self.endButton(action), role: action == .cancel ? .destructive : nil) { end(action, commands) }
         } message: { action in
-            Text(endMessage(action, screen))
+            Text(Self.endMessage(action, frames: screen.sides.map(\.frames)))
         }
         .alert("Nobody has reached the target", isPresented: $finishAnyway) {
             Button("Finish Anyway") { end(.finish, commands, anyway: true) }
@@ -156,15 +156,18 @@ public struct LiveMatchView: View {
     }
 
     private func endTitle(_ screen: LiveMatchScreen) -> String {
-        switch ending {
+        ending.map(Self.endTitle) ?? ""
+    }
+
+    static func endTitle(_ action: EndAction) -> String {
+        switch action {
         case .finish: "Finish this match?"
         case .abandon: "Abandon this match?"
         case .cancel: "Cancel this match?"
-        case nil: ""
         }
     }
 
-    private func endButton(_ action: EndAction) -> String {
+    static func endButton(_ action: EndAction) -> String {
         switch action {
         case .finish: "Finish Match"
         case .abandon: "Abandon Match"
@@ -172,9 +175,9 @@ public struct LiveMatchView: View {
         }
     }
 
-    private func endMessage(_ action: EndAction, _ screen: LiveMatchScreen) -> String {
+    static func endMessage(_ action: EndAction, frames: [Int]) -> String {
         switch action {
-        case .finish: "The result goes into the history at \(screen.sides.map { "\($0.frames)" }.joined(separator: "–"))."
+        case .finish: "The result goes into the history at \(frames.map(String.init).joined(separator: "–"))."
         case .abandon: "It stays in the history, marked abandoned."
         case .cancel: "The match is discarded and not kept in the history."
         }

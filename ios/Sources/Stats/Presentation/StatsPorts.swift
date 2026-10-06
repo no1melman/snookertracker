@@ -4,9 +4,12 @@ import SwiftUI
 /// The Stats application ports a view may use, injected by the composition root.
 public struct StatsPorts: Sendable {
     public let history: any MatchHistoryQuery
+    /// Matches' `DeleteMatch` (S30), adapted by the composition root; nil hides delete.
+    public let deleteMatch: (@MainActor @Sendable (UUID) throws -> Void)?
 
-    public init(history: any MatchHistoryQuery) {
+    public init(history: any MatchHistoryQuery, deleteMatch: (@MainActor @Sendable (UUID) throws -> Void)? = nil) {
         self.history = history
+        self.deleteMatch = deleteMatch
     }
 }
 

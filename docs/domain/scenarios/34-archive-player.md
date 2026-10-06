@@ -3,9 +3,9 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline), ADR-0008
 **Actor:** Scorer
-**Trigger / interface:** Settings → Players → archive
+**Trigger / interface:** Swipe an active player on the Players screen or the New Game player list (icon-only action); or Settings → Players → archive. No confirmation (S35 reverses it).
 **Description:** For someone no longer played. They disappear from name suggestions; their templates are hidden; their matches drop out of past matches and stats unless "include archived players" is on; series keep their setups, hidden.
 
 ## Relations

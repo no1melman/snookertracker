@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 created: 2026-10-05
 priority: high
 tags:
@@ -11,7 +11,10 @@ depends_on:
 - '14'
 parent: '1'
 created_at: 2026-10-05T10:42:31.503356Z
-updated_at: 2026-10-05T10:42:31.503356Z
+updated_at: 2026-10-06T19:22:25.877955Z
+transitions:
+- status: in-progress
+  at: 2026-10-06T19:22:25.877955Z
 ---
 
 # Match use cases: ending, stale & maintenance
@@ -35,7 +38,7 @@ Command-side use cases for ending, maintaining and cleaning up matches. Source: 
 - [ ] `WarnLongFrame` (Clock-triggered): define a `NotificationScheduler` port here and test against an in-memory fake; the UserNotifications adapter is in 019
 - [ ] `CorrectMatchScore` (timeline → Edit). Resolve or re-defer Q1 and Q2.
 - [ ] `MarkMatchFinished`
-- [ ] `DeleteMatch` (swipe + confirmation)
+- [x] `DeleteMatch` (swipe + confirmation)
 
 ## UI (design language: 022)
 - [ ] The live screen's **⋯ menu**:
@@ -46,7 +49,9 @@ Command-side use cases for ending, maintaining and cleaning up matches. Source: 
 - [ ] **Match detail actions** (013):
   - Correct score (Edit from the timeline)
   - Mark finished (abandoned matches only)
-  - Delete (swipe, with confirmation)
+  - [x] Delete (swipe on a History row, with confirmation)
+- [x] **Swipe a live match** in the hub's Live section: Finish or Abandon, with the live screen's confirmations (Finish short of the target asks "Finish anyway")
+- Swipe actions are icon-only (no caption under the icon)
 
 ## Non-goals
 - The iOS lifecycle and notification adapters (their own specs)
@@ -60,3 +65,8 @@ Command-side use cases for ending, maintaining and cleaning up matches. Source: 
   - Stale with no history falling back to 3 h
 
 **Implementation skill:** `ddd-application-layer` · **Tests:** `ddd-testing`
+
+## Progress (2026-10-06)
+- `DeleteMatch` is in `MatchCommands` / `MatchUseCases`. It loads the match, calls `Match.delete` (ended matches only), saves and publishes `MatchDeleted`. Stats folds that to no record, so the match leaves History and stats. Tests: `MatchesIntegrationTests` (ended → deleted and published; live → refused).
+- History gets `DeleteMatch` as a closure on `StatsPorts`, wired in the composition root, so Stats Presentation does not import Matches.
+- The live row swipe reuses `LiveMatchView`'s dialog title, button and message, now static.

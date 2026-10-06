@@ -40,6 +40,8 @@ import Foundation
     func finishMatch(_ match: MatchID, anyway: Bool) throws
     func abandonMatch(_ match: MatchID) throws
     func cancelMatch(_ match: MatchID) throws
+    /// Deletes an ended match (S30); a live match throws `notAllowedNow`.
+    func deleteMatch(_ match: MatchID) throws
 }
 
 // MARK: - Supplier port (Players context, adapted in the composition root)

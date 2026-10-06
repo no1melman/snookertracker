@@ -3,7 +3,7 @@ import Foundation
 import MatchesDomain
 import MatchesPublished
 
-/// The live-play use cases (spec 010) behind `MatchCommands`. Each one is
+/// The live-play and maintenance use cases (specs 010, 015) behind `MatchCommands`. Each one is
 /// load → domain behaviour → save → dispatch Stage 2 events → update the read model.
 @MainActor
 public final class MatchUseCases: MatchCommands {
@@ -92,6 +92,12 @@ public final class MatchUseCases: MatchCommands {
 
     public func cancelMatch(_ match: MatchID) throws {
         try change(match) { $0.cancel(at: $1) }
+    }
+
+    // MARK: Maintenance (spec 015)
+
+    public func deleteMatch(_ match: MatchID) throws {
+        try change(match) { $0.delete(at: $1) }
     }
 
     // MARK: Plumbing
