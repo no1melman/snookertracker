@@ -5,7 +5,7 @@ import LiveActivityShared
 import SwiftUI
 import WidgetKit
 
-// The lock-screen match (spec 018, design language 022): player colour plates and names, the score
+// The lock-screen match (spec 018, design language 022): player colour bars and names, the score
 // in monospaced digits, the breaker dot, the frame timer, + per player and Pause or Resume.
 
 @main
@@ -56,59 +56,77 @@ struct MatchLiveActivity: Widget {
 
 // MARK: - Lock screen
 
+/// One compact row (colour bar, name, score | frame clock | score, name, colour bar) over one row of
+/// controls, so the activity stays well inside the lock screen's height limit.
 struct LockScreenMatchView: View {
     let state: MatchState
 
     var body: some View {
-        VStack(spacing: 12) {
-            HStack(alignment: .center, spacing: 8) {
-                SideHeader(side: state.sides[0], paused: state.isPaused, alignment: .leading)
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                SideRow(side: state.sides[0], paused: state.isPaused, leading: true)
                 FrameClock(state: state, font: .subheadline)
                     .fixedSize()
-                SideHeader(side: state.sides[1], paused: state.isPaused, alignment: .trailing)
+                SideRow(side: state.sides[1], paused: state.isPaused, leading: false)
             }
             MatchButtons(state: state, compact: false)
         }
-        .padding(16)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
     }
 }
 
-/// Colour plate, name, breaker dot and the score, mirrored for the right-hand side.
-struct SideHeader: View {
+/// Colour bar, name with the breaker dot, then the score; mirrored for the right-hand side. The name
+/// gives way to the score when space is short.
+struct SideRow: View {
     let side: MatchState.Side
     let paused: Bool
-    let alignment: HorizontalAlignment
+    let leading: Bool
 
     var body: some View {
-        let leading = alignment == .leading
-        HStack(spacing: 10) {
-            if !leading { score }
-            VStack(alignment: alignment, spacing: 6) {
-                Capsule().fill(PlayerColour.color(side.colour)).frame(width: 36, height: 6)
-                HStack(spacing: 5) {
-                    if !leading { BreakerDot(isBreaker: side.isBreaker) }
-                    Text(side.name)
-                        .font(.headline)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    if leading { BreakerDot(isBreaker: side.isBreaker) }
-                }
+        HStack(spacing: 6) {
+            if leading {
+                bar
+                name
+                Spacer(minLength: 4)
+                score
+            } else {
+                score
+                Spacer(minLength: 4)
+                name
+                bar
             }
-            if leading { score }
         }
-        .frame(maxWidth: .infinity, alignment: leading ? .leading : .trailing)
+        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(side.name) \(side.frames)\(side.isBreaker ? ", to break" : "")")
     }
 
+    private var bar: some View {
+        Capsule().fill(PlayerColour.color(side.colour)).frame(width: 4, height: 30)
+    }
+
+    private var name: some View {
+        HStack(spacing: 4) {
+            if !leading { BreakerDot(isBreaker: side.isBreaker) }
+            Text(side.name)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .truncationMode(.tail)
+            if leading { BreakerDot(isBreaker: side.isBreaker) }
+        }
+    }
+
     private var score: some View {
         Text(side.frames, format: .number)
-            .font(.system(size: 44, weight: .bold, design: .rounded))
+            .font(.system(size: 34, weight: .bold, design: .rounded))
             .monospacedDigit()
             .contentTransition(.numericText(value: Double(side.frames)))
-            .foregroundStyle(paused ? .secondary : .primary)
+            .opacity(paused ? 0.5 : 1)
             .lineLimit(1)
-            .minimumScaleFactor(0.6)
+            .fixedSize()
+            .layoutPriority(1)
     }
 }
 
@@ -118,7 +136,7 @@ struct BreakerDot: View {
     var body: some View {
         Circle()
             .fill(isBreaker ? Color.primary : .clear)
-            .frame(width: 7, height: 7)
+            .frame(width: 6, height: 6)
             .accessibilityHidden(true)
     }
 }
@@ -130,14 +148,14 @@ struct FrameClock: View {
 
     var body: some View {
         let frame = state.sides.reduce(0) { $0 + $1.frames } + 1
-        VStack(spacing: 2) {
+        VStack(spacing: 1) {
             if state.isPaused {
                 Label("Paused", systemImage: "pause.circle.fill")
-                    .font(.caption.weight(.semibold))
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(.orange)
             } else {
                 Text("Frame \(frame)")
-                    .font(.caption.weight(.medium))
+                    .font(.caption2.weight(.medium))
                     .foregroundStyle(.secondary)
             }
             Text(timerInterval: state.frameTimerStart...Date.distantFuture, pauseTime: state.pausedAt,
@@ -145,25 +163,26 @@ struct FrameClock: View {
                 .font(font.weight(.semibold))
                 .monospacedDigit()
                 .multilineTextAlignment(.center)
-                .foregroundStyle(state.isPaused ? .secondary : .primary)
-                .frame(minWidth: 56)
+                .opacity(state.isPaused ? 0.5 : 1)
+                .frame(width: 60)
         }
         .accessibilityElement(children: .combine)
     }
 }
 
-/// + for each player, with Pause between; a single Resume while paused.
+/// + for each player, with Pause between; a single Resume while paused. With no + to offer, one
+/// short line of status (and Pause, if allowed) instead.
 struct MatchButtons: View {
     let state: MatchState
     let compact: Bool
 
     var body: some View {
-        let height: CGFloat = compact ? 40 : 48
+        let height: CGFloat = compact ? 36 : 40
         HStack(spacing: 8) {
             if state.canResume {
                 Button(intent: ResumeMatchIntent(match: state.matchID)) {
                     Label("Resume", systemImage: "play.fill")
-                        .font(.headline)
+                        .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: height)
                 }
                 .tint(.orange)
@@ -172,21 +191,23 @@ struct MatchButtons: View {
                 pause(height: height)
                 plus(state.sides[1], height: height)
             } else {
-                Text(state.canPause ? "Choose the breaker in the app" : "Target reached – finish in the app")
-                    .font(.footnote)
+                Text(state.canPause ? "Choose the breaker in the app" : "Target reached · finish in the app")
+                    .font(.footnote.weight(.medium))
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: height)
-                if state.canPause { pause(height: height) }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, alignment: state.canPause ? .leading : .center)
+                if state.canPause { pause(height: 32) }
             }
         }
         .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.roundedRectangle(radius: 14))
+        .buttonBorderShape(.roundedRectangle(radius: 12))
     }
 
     private func plus(_ side: MatchState.Side, height: CGFloat) -> some View {
         Button(intent: AwardFrameIntent(match: state.matchID, player: side.player)) {
-            HStack(spacing: 6) {
-                Image(systemName: "plus").font(.title3.weight(.bold))
+            HStack(spacing: 5) {
+                Image(systemName: "plus").font(.body.weight(.bold))
                 if !compact {
                     Text(side.name).font(.subheadline.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.7)
                 }
@@ -200,8 +221,8 @@ struct MatchButtons: View {
     private func pause(height: CGFloat) -> some View {
         Button(intent: PauseMatchIntent(match: state.matchID)) {
             Image(systemName: "pause.fill")
-                .font(.title3.weight(.semibold))
-                .frame(minWidth: height, minHeight: height)
+                .font(.body.weight(.semibold))
+                .frame(minWidth: height + 8, minHeight: height)
         }
         .tint(.gray)
         .accessibilityLabel("Pause")
@@ -226,7 +247,7 @@ struct ExpandedSide: View {
             Text(side.frames, format: .number)
                 .font(.system(size: 34, weight: .bold, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(paused ? .secondary : .primary)
+                .opacity(paused ? 0.5 : 1)
                 .contentTransition(.numericText(value: Double(side.frames)))
         }
         .padding(.horizontal, 4)
@@ -246,7 +267,7 @@ struct CompactScore: View {
             Text(side.frames, format: .number)
                 .font(.callout.weight(.bold))
                 .monospacedDigit()
-                .foregroundStyle(paused ? .secondary : .primary)
+                .opacity(paused ? 0.5 : 1)
             if !plateFirst { plate }
         }
         .accessibilityLabel("\(side.name) \(side.frames)")

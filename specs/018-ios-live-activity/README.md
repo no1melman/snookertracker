@@ -56,3 +56,7 @@ The lock-screen live match (S47): an ActivityKit Live Activity with App Intents 
 - Widget extension `LiveActivityWidget` (xcodegen). The app has `NSSupportsLiveActivities`. No extra entitlements, so it works with the free personal team.
 - Q4 is still deferred. Lock-screen and in-app commands are serialised on the main actor, so they apply in the order they arrive. + is offered only while In Play.
 - Open: tie-break by creation order when two matches start in the same instant (`LiveMatchesProjection` sorts by start time only). Visual check of the lock screen is still to do on a device or the Simulator GUI. The headless simulator confirmed that the activity goes active and renders.
+
+## Progress (2026-10-06)
+- Lock-screen redesign: the old layout was about 157pt, close to the roughly 160pt cap, with crowded names, floating colour plates and washed-out paused scores. It is now one row per side (colour bar, name and breaker dot, 34pt score) around the frame clock, over one 40pt row of controls, about 128pt in all. The text-only states (choose breaker, target reached) are a single short line. Paused dims scores and the timer by opacity rather than switching to `.secondary`, so they don't pick up the background tint. The Dynamic Island uses the same paused treatment.
+- Checked in a scratch harness app on the iPhone 18 Pro simulator that renders the real widget views (Xcode 27 has no Simulator GUI to lock the device, and `simctl` screenshots don't capture the Dynamic Island). The real lock screen still needs a check on the device.
