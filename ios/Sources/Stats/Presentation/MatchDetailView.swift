@@ -1,6 +1,7 @@
 import DesignSystem
 import StatsApplication
 import SwiftUI
+import UpgradePublished
 
 /// Match detail (spec 013), from `MatchTimeline`: result, corrections beside the original score,
 /// and per frame the winner, frame time, match time and running score. With `MatchDetailActions`
@@ -14,6 +15,8 @@ public struct MatchDetailView: View {
     @State private var confirmMarkFinished = false
     @State private var confirmDelete = false
     @State private var error: String?
+    /// A correction the edition refused: the offer opens once the edit sheet has closed (S52).
+    @State private var refusedCorrection: PaidFeature?
 
     public init(matchID: UUID) {
         self.matchID = matchID
@@ -69,9 +72,11 @@ public struct MatchDetailView: View {
         .toolbar {
             if let actions { toolbar(t, actions) }
         }
-        .sheet(isPresented: $editing) {
+        .sheet(isPresented: $editing, onDismiss: offerRefusedCorrection) {
             if let actions {
-                ScoreCorrectionSheet(timeline: t, correct: { try actions.correctScore(matchID, $0, $1) })
+                ScoreCorrectionSheet(
+                    timeline: t, correct: { try actions.correctScore(matchID, $0, $1) },
+                    refused: { refusedCorrection = $0 })
             }
         }
         .confirmationDialog("Mark this match finished?", isPresented: $confirmMarkFinished, titleVisibility: .visible) {
@@ -82,8 +87,8 @@ public struct MatchDetailView: View {
         .confirmationDialog("Delete this match?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete Match", role: .destructive) {
                 attempt($error) {
-                    try actions?.delete(matchID)
-                    dismiss()
+                    // A refused deletion leaves the match (and this screen) as it was; the offer is open.
+                    if try actions?.delete(matchID) == true { dismiss() }
                 }
             }
         } message: {
@@ -109,6 +114,13 @@ public struct MatchDetailView: View {
                 Button("Delete Match", systemImage: "trash", role: .destructive) { confirmDelete = true }
             }
         }
+    }
+
+    /// The edit sheet closed after a refused correction: nothing was saved, so open the offer now.
+    private func offerRefusedCorrection() {
+        guard let feature = refusedCorrection else { return }
+        refusedCorrection = nil
+        ports?.showUpgradeOffer(feature)
     }
 
     /// Winner as for finishing early: whoever is ahead; level is a draw (S31).
@@ -250,7 +262,9 @@ private struct FrameRow: View {
 /// are warnings to confirm or fix.
 private struct ScoreCorrectionSheet: View {
     let timeline: MatchTimeline
-    let correct: @MainActor (ScoreEdit, Bool) throws -> [String]
+    let correct: @MainActor (ScoreEdit, Bool) throws -> CorrectionOutcome
+    /// The edition refused the correction: nothing saved; the sheet closes and the detail opens the offer.
+    let refused: @MainActor (PaidFeature) -> Void
     @Environment(\.dismiss) private var dismiss
     /// One entry for a frames match; one per set for the sets style.
     @State private var scores: [ScorePair]
@@ -258,9 +272,13 @@ private struct ScoreCorrectionSheet: View {
     @State private var warnings: [String] = []
     @State private var error: String?
 
-    init(timeline: MatchTimeline, correct: @escaping @MainActor (ScoreEdit, Bool) throws -> [String]) {
+    init(
+        timeline: MatchTimeline, correct: @escaping @MainActor (ScoreEdit, Bool) throws -> CorrectionOutcome,
+        refused: @escaping @MainActor (PaidFeature) -> Void
+    ) {
         self.timeline = timeline
         self.correct = correct
+        self.refused = refused
         _scores = State(initialValue: Self.current(timeline))
     }
 
@@ -331,8 +349,14 @@ private struct ScoreCorrectionSheet: View {
         if !typed.isEmpty { applyTyped() }
         let edit: ScoreEdit = timeline.isSets ? .sets(scores) : .frames(scores[0])
         do {
-            let needsConfirming = try correct(edit, confirmed)
-            if needsConfirming.isEmpty { dismiss() } else { warnings = needsConfirming }
+            switch try correct(edit, confirmed) {
+            case .saved: dismiss()
+            case .needsConfirming(let found): warnings = found
+            case .refused(let feature):
+                // Not saved: close without claiming success; the offer opens once the sheet is gone.
+                refused(feature)
+                dismiss()
+            }
         } catch {
             self.error = error.localizedDescription
         }

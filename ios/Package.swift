@@ -95,6 +95,13 @@ targets.append(.target(
         + contexts.flatMap { c in ["Application", "Infrastructure", "Presentation"].map { Target.Dependency(stringLiteral: "\(c)\($0)") } },
     path: "Sources/AppComposition"))
 
+// The composition root's adapters over the real use cases (never `AppContainer` itself).
+targets.append(.testTarget(
+    name: "AppCompositionTests",
+    dependencies: ["AppComposition", "MatchesApplication", "MatchesInfrastructure", "StatsPresentation",
+                   "UpgradePublished", "EventDispatch", "SQLiteSupport"],
+    path: "Tests/AppComposition"))
+
 let package = Package(
     name: "SnookerTracker",
     platforms: [.iOS(.v17), .macOS(.v14)],

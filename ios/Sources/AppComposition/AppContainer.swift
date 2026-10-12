@@ -227,36 +227,14 @@ final class AppContainer {
     /// History match detail: Edit score, Mark finished, Delete (spec 015).
     var matchDetailActions: MatchDetailActions {
         MatchDetailActions(
-            correctScore: { [matchCommands, showUpgradeOffer] id, edit, confirmed in
-                let score: CorrectedScore = switch edit {
-                case .frames(let p): .frames(first: p.first, second: p.second)
-                case .sets(let sets): .sets(sets.map { SetScore(first: $0.first, second: $0.second) })
-                }
-                do {
-                    try matchCommands.correctMatchScore(id, to: score, confirmed: confirmed)
-                    return []
-                } catch MatchCommandError.correctionNeedsConfirmation(let warnings) {
-                    return warnings
-                } catch let refused as UpgradeRequired {
-                    // Free: only the newest ended matches can be corrected (S29) → upgrade offer (S52).
-                    showUpgradeOffer(refused.feature)
-                    return []
-                }
-            },
+            correctScore: HistoryMaintenance.correctScore(matchCommands),
             markFinished: { [matchCommands] in try matchCommands.markMatchFinished($0) },
             delete: deleteMatchOrOffer)
     }
 
-    /// The Scorer's `DeleteMatch` (S30); a Free refusal (beyond the newest ended matches) opens the
-    /// upgrade offer (S52) instead of an error.
-    var deleteMatchOrOffer: @MainActor @Sendable (UUID) throws -> Void {
-        { [matchCommands, showUpgradeOffer] id in
-            do {
-                try matchCommands.deleteMatch(id)
-            } catch let refused as UpgradeRequired {
-                showUpgradeOffer(refused.feature)
-            }
-        }
+    /// The Scorer's `DeleteMatch` (S30): true once deleted; a Free refusal opens the offer (S52).
+    var deleteMatchOrOffer: @MainActor @Sendable (UUID) throws -> Bool {
+        HistoryMaintenance.deleteOrOffer(matchCommands, showUpgradeOffer: showUpgradeOffer)
     }
 
     /// New Game's swipe to archive (ADR-0008), adapted from Players.
@@ -266,7 +244,7 @@ final class AppContainer {
 
     var statsPorts: StatsPorts {
         StatsPorts(
-            history: matchRecords, deleteMatch: deleteMatchOrOffer,
+            history: matchRecords, deleteMatch: { [deleteMatchOrOffer] in _ = try deleteMatchOrOffer($0) },
             stats: matchRecords, me: { [players] in players.me?.id },
             edition: edition, showUpgradeOffer: showUpgradeOffer)
     }
