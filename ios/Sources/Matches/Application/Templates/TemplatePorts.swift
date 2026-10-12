@@ -68,8 +68,12 @@ public struct TemplateRow: Identifiable, Hashable, Sendable {
 }
 
 /// `TemplateList` (spec 008): most used first. Empty → New Game opens straight on the details step.
+/// While Free (spec 026) the list is replaced by an "Upgrade now" prompt in place: `templates` is
+/// empty and `showsUpgradePrompt` is true. Templates are still recorded and come back on unlock.
 @MainActor public protocol TemplateListQuery: AnyObject, Sendable {
     var templates: [TemplateRow] { get }
+    /// Free: show the "Upgrade now" prompt where the template list would be (S1, S52).
+    var showsUpgradePrompt: Bool { get }
 }
 
 public extension TemplateListQuery {
@@ -77,7 +81,7 @@ public extension TemplateListQuery {
     var opensOnDetails: Bool { templates.isEmpty }
 }
 
-/// `DeleteTemplate` (swipe).
+/// `DeleteTemplate` (swipe). Free: throws `UpgradeRequired(.templates)` (S36, S52).
 @MainActor public protocol TemplateCommands: AnyObject, Sendable {
     func deleteTemplate(_ id: TemplateID) throws
 }

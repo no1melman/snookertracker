@@ -16,10 +16,30 @@ public final class TemplateListProjection: TemplateListQuery {
     private var entries: [TemplateListEntry] = []
     /// Archived players: seeded at launch, then kept by `HideArchivedPlayersTemplates`.
     private var archived: Set<PlayerRef> = []
+    /// Upgrade's `CurrentEdition` (ADR-0011): while Free the list is replaced by the "Upgrade now"
+    /// prompt (spec 026). `TemplateUseCases` hands over its own edition.
+    @ObservationIgnored public var edition: any CurrentEdition
+    /// Bumped on `AppUnlocked` / `AppLocked`, so the list and the prompt re-render.
+    private var editionChanges = 0
 
-    public init(reader: any TemplateListReader, players: any MatchPlayerDirectory) {
+    public init(
+        reader: any TemplateListReader, players: any MatchPlayerDirectory,
+        edition: any CurrentEdition = FixedEdition.unlocked
+    ) {
         self.reader = reader
         self.directory = players
+        self.edition = edition
+    }
+
+    /// Free: the "Upgrade now" prompt shows in place of the list (S1, S52).
+    public var showsUpgradePrompt: Bool {
+        _ = editionChanges
+        return !edition.allows(.templates)
+    }
+
+    /// `AppUnlocked` / `AppLocked`: the list or the prompt shows straight away.
+    public func editionChanged() {
+        editionChanges += 1
     }
 
     public func reload() throws {
@@ -41,8 +61,10 @@ public final class TemplateListProjection: TemplateListQuery {
         archived.remove(player)
     }
 
+    /// Empty while Free: the prompt replaces the list. The stored templates are untouched.
     public var templates: [TemplateRow] {
-        entries.compactMap { entry in
+        if showsUpgradePrompt { return [] }
+        return entries.compactMap { entry in
             guard let firstRef = entry.setup.first.ref, let secondRef = entry.setup.second.ref,
                   !archived.contains(firstRef), !archived.contains(secondRef),
                   let first = directory.player(firstRef),
@@ -65,7 +87,10 @@ public final class TemplateUseCases: TemplateCommands {
     private let newID: @Sendable () -> UUID
     /// Upgrade's `CurrentEdition` open host (ADR-0011): read it before a guarded action. Unlocked
     /// (no limits) until the composition root hands over the device's edition.
-    public var edition: any CurrentEdition
+    /// The list reads the same edition.
+    public var edition: any CurrentEdition {
+        didSet { list.edition = edition }
+    }
 
     public init(
         repository: any TemplateRepository, list: TemplateListProjection,
@@ -76,6 +101,7 @@ public final class TemplateUseCases: TemplateCommands {
         self.repository = repository
         self.list = list
         self.newID = newID
+        list.edition = edition
     }
 
     /// Rebuilds the list from the store (launch).
@@ -86,6 +112,7 @@ public final class TemplateUseCases: TemplateCommands {
     // MARK: CreateOrUseTemplate
 
     /// A match with `setup` started: its template records a use, or one is created with use count 1.
+    /// Runs whatever the edition: while Free it is recorded silently (S12, ADR-0010).
     public func createOrUseTemplate(for setup: Setup) throws {
         let existing = try repository.findBySetup(setup)
         switch TemplateUse.record(setup, existing: existing, newId: TemplateId(newID())) {
@@ -106,11 +133,21 @@ public final class TemplateUseCases: TemplateCommands {
                 try? self?.createOrUseTemplate(for: started.setup)
             }
         }
+        // AppUnlocked / AppLocked: the list or the "Upgrade now" prompt shows straight away.
+        dispatcher.subscribe(AppUnlockedPublished.self) { [weak self] _ in
+            MainActor.assumeIsolated { self?.list.editionChanged() }
+        }
+        dispatcher.subscribe(AppLockedPublished.self) { [weak self] _ in
+            MainActor.assumeIsolated { self?.list.editionChanged() }
+        }
     }
 
     // MARK: DeleteTemplate
 
+    /// The Scorer's swipe (S36). Free: refused with `UpgradeRequired(.templates)`; the cascade from a
+    /// removed player (`deleteTemplates(of:)`, S42) is never limited.
     public func deleteTemplate(_ id: TemplateID) throws {
+        guard edition.allows(.templates) else { throw UpgradeRequired(.templates) }
         guard let template = try repository.getById(id) else { return }  // already gone: nothing to do
         switch template.delete() {
         case .success(let deleted): try commit(deleted)
@@ -120,7 +157,7 @@ public final class TemplateUseCases: TemplateCommands {
 
     // MARK: Player reactions (spec 011)
 
-    /// `DeleteTemplate` for each template of a removed player (S42).
+    /// `DeleteTemplate` for each template of a removed player (S42), whatever the edition.
     public func deleteTemplates(of player: PlayerRef) throws {
         for template in try repository.findByPlayer(player) {
             if case .success(let deleted) = template.delete() { try save(deleted) }

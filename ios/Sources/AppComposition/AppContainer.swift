@@ -82,6 +82,7 @@ final class AppContainer {
             dispatcher: dispatcher, edition: edition)
         directory = PlayersForMatches(list: players, commands: players)
         matchSettings = try MatchSettingsService(store: SQLiteMatchSettingsStore(db: db), edition: edition)
+        matchSettings.subscribe(to: dispatcher)  // effective values follow AppUnlocked / AppLocked (spec 026)
         liveMatches = LiveMatchesProjection(players: directory)
         let store = try SQLiteMatchEventStore(db: db, originDevice: DeviceIdentity.id(in: db))
         // Stats (spec 013): subscribe before any command can dispatch, then catch up on everything

@@ -1,5 +1,6 @@
 import DesignSystem
 import MatchesApplication
+import UpgradePublished
 import SwiftUI
 
 /// New Game: recent setups (`TemplateList`, spec 008) on top, most used first: one tap starts that
@@ -30,8 +31,14 @@ public struct NewGameView: View {
     public var body: some View {
         let players = ports?.players.suggestions ?? []
         let templates = ports?.templates?.templates ?? []
+        let templatesLocked = ports?.templates?.showsUpgradePrompt ?? false
         Form {
-            if !templates.isEmpty {
+            if templatesLocked, let ports {
+                // Free (S1, S52): "Upgrade now" in place of the template list, opening the offer there.
+                Section("Recent") {
+                    TemplatesUpgradePrompt { ports.showUpgradeOffer(.templates) }
+                }
+            } else if !templates.isEmpty {
                 Section("Recent") {
                     ForEach(templates) { template in
                         TemplateRowButton(template: template) { start(template.setup) }
@@ -77,7 +84,7 @@ public struct NewGameView: View {
                         .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             } header: {
-                Text(templates.isEmpty ? "Players" : "Or enter details")
+                Text(templates.isEmpty && !templatesLocked ? "Players" : "Or enter details")
             } footer: {
                 Text("Pick two.")
             }
@@ -204,9 +211,16 @@ public struct NewGameView: View {
         }
     }
 
+    /// Free: the refusal opens the upgrade offer (S36, S52).
     private func delete(_ template: TemplateRow) {
-        guard let commands = ports?.templateCommands else { return }
-        attempt($error) { try commands.deleteTemplate(template.id) }
+        guard let ports, let commands = ports.templateCommands else { return }
+        do {
+            try commands.deleteTemplate(template.id)
+        } catch let refused as UpgradeRequired {
+            ports.showUpgradeOffer(refused.feature)
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     /// The player drops out of the list (suggestions are active players); a refusal (in a live
@@ -226,6 +240,38 @@ public typealias ArchivePlayerAction = @MainActor @Sendable (PlayerRef) throws -
 public extension EnvironmentValues {
     /// nil hides the swipe-to-archive action on New Game's player list.
     @Entry var archivePlayer: ArchivePlayerAction? = nil
+}
+
+/// Free (S1, S52): the "Upgrade now" prompt shown in place of the template list. Tapping it opens the
+/// upgrade offer in place; it is never a pop-up.
+struct TemplatesUpgradePrompt: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Start again in one tap")
+                        .font(.body.weight(.semibold))
+                    Text("Every setup you play is kept as a template.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Text("Upgrade now")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+            }
+            .contentShape(Rectangle())
+            .frame(minHeight: 44)
+            .padding(.vertical, 2)
+        }
+        .tint(.primary)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Templates. Upgrade now")
+        .accessibilityHint("Shows the upgrade offer")
+        .accessibilityAddTraits(.isButton)
+    }
 }
 
 /// One recent setup: both players' plates, then the game, the style and targets as entered and the
@@ -332,7 +378,9 @@ public struct MatchStyleEditor: View {
     }
 }
 
-/// Settings › Match defaults (spec 007). Changes apply to new matches only.
+/// Settings › Match defaults (spec 007). Changes apply to new matches only. While Free (spec 026) the
+/// style, break rule and limit show the Free values; touching them opens the upgrade offer, and the
+/// game stays editable.
 public struct MatchDefaultsSection: View {
     @Environment(\.matchesPorts) private var ports
     @State private var error: String?
@@ -340,8 +388,11 @@ public struct MatchDefaultsSection: View {
     public init() {}
 
     public var body: some View {
-        if let settings = ports?.settings {
-            let defaults = Binding { settings.defaults } set: { new in attempt($error) { try settings.changeDefaults(new) } }
+        if let ports {
+            let settings = ports.settings
+            let defaults = Binding { settings.defaults } set: { new in
+                guardedSettingsChange(ports, $error) { try settings.changeDefaults(new) }
+            }
             Section {
                 Picker("Game", selection: defaults.game) {
                     ForEach(Game.allCases, id: \.self) { Text($0.title).tag($0) }
@@ -356,11 +407,26 @@ public struct MatchDefaultsSection: View {
                 Text("Changes apply to new matches only.")
             }
             Section {
-                Stepper(value: Binding { settings.liveMatchLimit } set: { settings.changeLiveMatchLimit($0) }, in: 1...100) {
+                Stepper(value: Binding { settings.liveMatchLimit } set: { new in
+                    guardedSettingsChange(ports, $error) { try settings.setLiveMatchLimit(new) }
+                }, in: 1...100) {
                     LabeledContent("Live match limit", value: "\(settings.liveMatchLimit)").monospacedDigit()
                 }
             }
             .errorAlert($error)
         }
+    }
+}
+
+/// Runs a settings change; a Free refusal routes to `ShowUpgradeOffer` (S52), anything else explains
+/// itself.
+@MainActor
+private func guardedSettingsChange(_ ports: MatchesPorts, _ message: Binding<String?>, _ change: () throws -> Void) {
+    do {
+        try change()
+    } catch let refused as UpgradeRequired {
+        ports.showUpgradeOffer(refused.feature)
+    } catch {
+        message.wrappedValue = error.localizedDescription
     }
 }

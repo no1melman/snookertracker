@@ -15,11 +15,17 @@ import Foundation
     func liveMatchScreen(_ id: MatchID) -> LiveMatchScreen?
 }
 
-/// `MatchSettingsView` + `ChangeMatchDefaults` (spec 007).
+/// `MatchSettingsView` + `ChangeMatchDefaults` + `SetLiveMatchLimit` (spec 007). The values are the
+/// effective ones: while Free, the Free style, break rule and live-match limit, whatever is stored
+/// (spec 026).
 @MainActor public protocol MatchSettings: AnyObject, Sendable {
     var defaults: MatchDefaults { get }
     var liveMatchLimit: Int { get }
+    /// Free: a style or break-rule change throws `UpgradeRequired`; the game stays free (S20, S21).
     func changeDefaults(_ defaults: MatchDefaults) throws
+    /// `SetLiveMatchLimit` (S44), paid: throws `UpgradeRequired(.severalLiveMatches)` while Free.
+    func setLiveMatchLimit(_ limit: Int) throws
+    /// `setLiveMatchLimit` ignoring a refusal or a failed write.
     func changeLiveMatchLimit(_ limit: Int)
 }
 
