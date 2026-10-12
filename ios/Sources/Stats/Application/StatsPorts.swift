@@ -154,7 +154,12 @@ public struct MatchTimeline: Hashable, Sendable {
 /// `PastMatches` + `MatchTimeline`. Reading either is observation-tracked, so views refresh as
 /// events arrive.
 @MainActor public protocol MatchHistoryQuery: AnyObject, Sendable {
-    /// Ended matches, newest first.
+    /// Ended matches, newest first. Free: only those among the newest `FreeLimits.visibleEndedMatches`
+    /// ended matches (S17); all on unlock.
     func pastMatches(_ filter: PastMatchesFilter) -> [PastMatchRow]
+    /// How many rows `filter` would show that the Free edition hides (History's "hidden" row, which
+    /// opens the upgrade offer); 0 once Unlocked.
+    func hiddenMatchCount(_ filter: PastMatchesFilter) -> Int
+    /// nil for a live, unknown or deleted match, and while Free for a hidden one.
     func timeline(_ match: UUID) -> MatchTimeline?
 }

@@ -1,5 +1,6 @@
 import DesignSystem
 import StatsApplication
+import UpgradePublished
 import SwiftUI
 
 /// History (spec 013): ended matches from `PastMatches`, newest first, grouped by month. Rows push
@@ -19,11 +20,16 @@ public struct HistoryView: View {
 
     public var body: some View {
         let rows = ports?.history.pastMatches(filter) ?? []
+        let hidden = ports?.history.hiddenMatchCount(filter) ?? 0
         Group {
-            if rows.isEmpty {
+            if rows.isEmpty && hidden == 0 {
                 emptyState
             } else {
                 List {
+                    if rows.isEmpty {
+                        Text("None of the matches you can see match this filter.")
+                            .foregroundStyle(.secondary)
+                    }
                     ForEach(months(rows), id: \.title) { month in
                         Section(month.title) {
                             ForEach(month.rows) { row in
@@ -36,6 +42,9 @@ public struct HistoryView: View {
                                     }
                             }
                         }
+                    }
+                    if hidden > 0 {
+                        Section { HiddenMatchesRow(count: hidden) { ports?.showUpgradeOffer(.fullHistory) } }
                     }
                 }
             }

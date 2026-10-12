@@ -24,7 +24,11 @@ public final class MatchRecordsProjection: MatchHistoryQuery {
     @ObservationIgnored let calendar: Calendar
     /// Upgrade's `CurrentEdition` open host (ADR-0011): read it before a guarded action. Unlocked
     /// (no limits) until the composition root hands over the device's edition.
+    /// The guards sit on the reads, never on the projection: records keep building while Free, so
+    /// unlocking shows everything at once with no rebuild (ADR-0010).
     @ObservationIgnored public var edition: any CurrentEdition
+    /// Bumped on `AppUnlocked` / `AppLocked` so observing views re-read under the new edition.
+    private var editionGeneration = 0
 
     public init(store: any StatsStore, calendar: Calendar = .current, edition: any CurrentEdition = FixedEdition.unlocked) throws {
         self.store = store
@@ -42,6 +46,21 @@ public final class MatchRecordsProjection: MatchHistoryQuery {
         dispatcher.subscribe(PlayerEventPublished.self) { [weak self] event in
             MainActor.assumeIsolated { self?.receive(event) }
         }
+        dispatcher.subscribe(AppUnlockedPublished.self) { [weak self] _ in
+            MainActor.assumeIsolated { self?.editionChanged() }
+        }
+        dispatcher.subscribe(AppLockedPublished.self) { [weak self] _ in
+            MainActor.assumeIsolated { self?.editionChanged() }
+        }
+    }
+
+    /// The edition changed: nothing is rebuilt, observing views just read again.
+    public func editionChanged() { editionGeneration += 1 }
+
+    /// Whether a read is locked for `feature` (observation-tracked through `editionGeneration`).
+    func locks(_ feature: PaidFeature) -> Bool {
+        _ = editionGeneration
+        return !edition.allows(feature)
     }
 
     // MARK: Taking in events
@@ -150,7 +169,30 @@ public final class MatchRecordsProjection: MatchHistoryQuery {
 
     // MARK: Queries
 
+    /// Free: only the rows among the newest `FreeLimits.visibleEndedMatches` ended matches; all on unlock.
     public func pastMatches(_ filter: PastMatchesFilter) -> [PastMatchRow] {
+        let rows = allPastMatches(filter)
+        guard let visible = visibleWhileFree() else { return rows }
+        return rows.filter { visible.contains($0.id) }
+    }
+
+    /// Rows `filter` would show that the Free edition hides; 0 once Unlocked.
+    public func hiddenMatchCount(_ filter: PastMatchesFilter) -> Int {
+        guard let visible = visibleWhileFree() else { return 0 }
+        return allPastMatches(filter).count { !visible.contains($0.id) }
+    }
+
+    /// While Free, the newest `visibleEndedMatches` ended matches in History's order (newest first),
+    /// whatever the filter: cancelled matches and archived players' matches take their place too, so
+    /// the visible set never shifts as the filter changes. nil once Unlocked (no limit).
+    func visibleWhileFree() -> Set<UUID>? {
+        _ = editionGeneration
+        guard edition.isFree, let limit = edition.limits?.visibleEndedMatches else { return nil }
+        let all = PastMatchesFilter(showCancelled: true, includeArchivedPlayers: true)
+        return Set(allPastMatches(all).prefix(limit).map(\.id))
+    }
+
+    private func allPastMatches(_ filter: PastMatchesFilter) -> [PastMatchRow] {
         records.values
             .filter { $0.isEnded && ($0.status != .cancelled || filter.showCancelled) }
             .compactMap { r -> PastMatchRow? in
@@ -162,8 +204,10 @@ public final class MatchRecordsProjection: MatchHistoryQuery {
             .sorted { ($0.startedAt, $0.id.uuidString) > ($1.startedAt, $1.id.uuidString) }
     }
 
+    /// Free: nil for a match History hides.
     public func timeline(_ match: UUID) -> MatchTimeline? {
         guard let r = records[match], r.isEnded else { return nil }
+        if let visible = visibleWhileFree(), !visible.contains(match) { return nil }
         let (a, b) = (resolve(r.first).view, resolve(r.second).view)
         let side = { (id: UUID) in id == r.first.player ? a : b }
         let running = r.runningScores()

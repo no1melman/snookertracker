@@ -1,5 +1,6 @@
 import DesignSystem
 import StatsApplication
+import UpgradePublished
 import SwiftUI
 
 /// Stats (spec 014, S18, S19): `Stats(filter)` from Me's point of view (or a chosen player), grouped
@@ -29,7 +30,12 @@ public struct StatsView: View {
 
     public var body: some View {
         Group {
-            if let query = ports?.stats {
+            if let query = ports?.stats, query.isStatsLocked {
+                LockedFeatureView(
+                    title: "Stats", systemImage: "chart.bar",
+                    message: "Stats by opponent and by day of the week come with the upgrade. Every match you play is counted already.",
+                    upgrade: upgrade)
+            } else if let query = ports?.stats {
                 if let pov = pointOfView {
                     content(query.stats(filter(pov)))
                 } else {
@@ -40,8 +46,9 @@ public struct StatsView: View {
             }
         }
         .navigationTitle("Stats")
+        .onAppear { if isLocked { upgrade() } }
         .toolbar {
-            if let query = ports?.stats, pointOfView != nil {
+            if let query = ports?.stats, !query.isStatsLocked, pointOfView != nil {
                 ToolbarItem(placement: .primaryAction) { pointOfViewMenu(query) }
                 ToolbarItem(placement: .primaryAction) {
                     Button { showingFilters = true } label: {
@@ -64,6 +71,10 @@ public struct StatsView: View {
     }
 
     private var isFiltered: Bool { narrowing.isActive || includeAbandoned || includeArchived }
+
+    /// Stats are paid (S18, S19): while Free the screen opens the generic upgrade offer (S52).
+    private var isLocked: Bool { ports?.stats?.isStatsLocked ?? false }
+    private func upgrade() { ports?.showUpgradeOffer(.stats) }
 
     // MARK: Content
 

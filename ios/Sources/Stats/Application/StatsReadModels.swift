@@ -146,6 +146,11 @@ public struct StatsReport: Hashable, Sendable {
     public let overall: StatsFigures
     /// Per the filter's grouping; most matches first (by weekday: Monday first). Empty when ungrouped.
     public let groups: [StatsGroup]
+    /// Stats are locked while Free: no figures, and the screen opens the upgrade offer (S52).
+    public var isLocked = false
+
+    /// The Free edition's answer: no point of view, no figures, no groups.
+    public static let locked = StatsReport(pointOfView: nil, overall: StatsFigures(), groups: [], isLocked: true)
 }
 
 /// What the Stats screen's filters can offer for a point of view.
@@ -165,7 +170,10 @@ public struct StatsChoices: Hashable, Sendable {
 
 /// `Stats(filter)` and the choices behind its filters. Observation-tracked, like `MatchHistoryQuery`.
 @MainActor public protocol StatsQuery: AnyObject, Sendable {
+    /// Locked while Free: `StatsReport.locked`, no figures.
     func stats(_ filter: StatsFilter) -> StatsReport
+    /// Stats are locked (Free); observation-tracked so the screen opens up on unlock.
+    var isStatsLocked: Bool { get }
     /// Players who can be the point of view: everyone not removed or merged away, by name.
     func statsPlayers(includeArchived: Bool) -> [HistoryPlayer]
     func statsChoices(for pointOfView: UUID, includeArchivedPlayers: Bool) -> StatsChoices
