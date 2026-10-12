@@ -1,6 +1,7 @@
 import Foundation
 import StatsDomain
 import StatsPublished
+import UpgradePublished
 
 /// `Stats(filter)` and the open-host queries for Matches (spec 014), read straight off the
 /// match records: no aggregate, deciders computed from the frames as played (ADR-0003).
@@ -8,7 +9,15 @@ extension MatchRecordsProjection: StatsQuery, MatchStatsQueries {
 
     // MARK: Stats(filter)
 
+    /// Locked while Free (S18, S19): no figures, `isLocked` set.
     public func stats(_ filter: StatsFilter) -> StatsReport {
+        locks(.stats) ? .locked : report(filter)
+    }
+
+    public var isStatsLocked: Bool { locks(.stats) }
+
+    /// `Stats(filter)` whatever the edition: the guarded reads sit on top of it.
+    func report(_ filter: StatsFilter) -> StatsReport {
         let pov = resolve(player: filter.pointOfView)
         var overall = StatsFigures()
         var groups: [StatsGroup.Key: (opponent: HistoryPlayer?, figures: StatsFigures)] = [:]
@@ -57,8 +66,10 @@ extension MatchRecordsProjection: StatsQuery, MatchStatsQueries {
 
     // MARK: Open host for Matches
 
+    /// Locked while Free (S14): no figures (`HeadToHead.none`); the live screen greys it itself.
     public func headToHead(_ a: UUID, _ b: UUID) -> HeadToHead {
-        let f = stats(StatsFilter(pointOfView: a, opponent: b, includeArchivedPlayers: true)).overall
+        if locks(.headToHead) { return .none }
+        let f = report(StatsFilter(pointOfView: a, opponent: b, includeArchivedPlayers: true)).overall
         return HeadToHead(won: f.won, drawn: f.drawn, lost: f.lost, framesWon: f.framesWon, framesLost: f.framesLost,
                           decidersWon: f.decidersWon, decidersLost: f.decidersLost)
     }

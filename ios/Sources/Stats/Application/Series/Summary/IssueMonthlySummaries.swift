@@ -2,6 +2,7 @@ import EventDispatch
 import Foundation
 import StatsDomain
 import StatsPublished
+import UpgradePublished
 
 /// `IssueMonthlySummaries` (spec 017, S38). Trigger: the clock, read on launch and whenever the app
 /// returns to the foreground (no background task). For every series it issues the previous month's
@@ -22,11 +23,16 @@ public final class IssueMonthlySummaries {
     private let calendar: Calendar
     /// The last failure for one series (a run never throws into launch).
     public private(set) var lastError: (any Error)?
+    /// Upgrade's `CurrentEdition` (ADR-0011): the run is skipped while Free (S38). Nothing is
+    /// recorded, so the first run after an unlock issues the previous month's summaries as usual.
+    public var edition: any CurrentEdition
 
     public init(
         repository: any SeriesRepository, summaries: MonthlySummaryProjection, log: any SeriesSummaryLog,
-        dispatcher: EventDispatcher, now: @escaping @Sendable () -> Date = Date.init, calendar: Calendar = .current
+        dispatcher: EventDispatcher, now: @escaping @Sendable () -> Date = Date.init, calendar: Calendar = .current,
+        edition: any CurrentEdition = FixedEdition.unlocked
     ) {
+        self.edition = edition
         self.repository = repository
         self.summaries = summaries
         self.log = log
@@ -38,6 +44,7 @@ public final class IssueMonthlySummaries {
     /// Issues every summary due now; returns what was issued. Safe to call repeatedly.
     @discardableResult
     public func run() -> [SeriesSummaryIssued] {
+        guard edition.allows(.series) else { return [] }
         let at = now()
         let current = Month.containing(at, calendar: calendar)
         let month = current.previous

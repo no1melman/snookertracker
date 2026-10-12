@@ -85,6 +85,8 @@ public struct SeriesRow: Identifiable, Hashable, Sendable {
 
 /// `SeriesList` plus the setups the create/edit sheet offers. Observation-tracked.
 @MainActor public protocol SeriesListQuery: AnyObject, Sendable {
+    /// Series are locked while Free (S52): `series` and `setupChoices` return none.
+    var isLocked: Bool { get }
     var series: [SeriesRow] { get }
     /// Setups of past matches, plus `including` ones (a series' current setups) not among them.
     func setupChoices(including: [SetupChoice]) -> [SetupChoice]
@@ -92,7 +94,8 @@ public struct SeriesRow: Identifiable, Hashable, Sendable {
     func refresh()
 }
 
-/// `CreateSeries`, `ChangeSeries`, `DeleteSeries` (Series screen).
+/// `CreateSeries`, `ChangeSeries`, `DeleteSeries` (Series screen). Each throws `UpgradeRequired(.series)`
+/// while Free.
 @MainActor public protocol SeriesCommands: AnyObject, Sendable {
     @discardableResult func createSeries(name: String, setups: [SetupChoice]) throws -> UUID
     func changeSeries(_ id: UUID, name: String, setups: [SetupChoice]) throws

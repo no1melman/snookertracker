@@ -94,7 +94,8 @@ final class AppContainer {
         // before the series list refreshes on a merge or removal.
         let seriesRepository = try SQLiteSeriesRepository(db: db)
         seriesList = SeriesListProjection(
-            reader: seriesRepository, catalog: StatsStoreSetupCatalog(records: statsStore, players: statsStore))
+            reader: seriesRepository, catalog: StatsStoreSetupCatalog(records: statsStore, players: statsStore),
+            edition: edition)
         seriesCommands = SeriesUseCases(repository: seriesRepository, list: seriesList, edition: edition)
         seriesCommands.subscribe(to: dispatcher)
         try seriesCommands.loadSeries()
@@ -102,7 +103,7 @@ final class AppContainer {
             stats: matchRecords, series: seriesRepository, me: { [players] in players.me?.id })
         issueSummaries = IssueMonthlySummaries(
             repository: seriesRepository, summaries: monthlySummaries,
-            log: try SQLiteSeriesSummaryLog(db: db), dispatcher: dispatcher)
+            log: try SQLiteSeriesSummaryLog(db: db), dispatcher: dispatcher, edition: edition)
         try matchRecords.seedPlayers(players.players.map {
             StatsPlayer(id: $0.id, name: $0.name, colour: $0.colour, isArchived: $0.isArchived)
         })

@@ -7,18 +7,30 @@ import UpgradePublished
 
 /// `SeriesList` read model (spec 016). Holds the stored rows (reloaded after every series change)
 /// and resolves names and colours from the catalog at read time. A setup whose player the catalog no
-/// longer knows is left out of the row.
+/// longer knows is left out of the row. Locked while Free (S52): the rows stay stored, the read
+/// returns none, and unlocking shows them all again.
 @MainActor @Observable
 public final class SeriesListProjection: SeriesListQuery {
     @ObservationIgnored private let reader: any SeriesListReader
     @ObservationIgnored private let catalog: any SeriesSetupCatalog
+    /// Upgrade's `CurrentEdition` (ADR-0011); Unlocked until the composition root hands it over.
+    @ObservationIgnored public var edition: any CurrentEdition
     private var entries: [SeriesListEntry] = []
-    /// Bumped on `refresh()` so rows re-resolve players.
+    /// Bumped on `refresh()` (player events, `AppUnlocked`, `AppLocked`) so rows re-resolve.
     private var generation = 0
 
-    public init(reader: any SeriesListReader, catalog: any SeriesSetupCatalog) {
+    public init(
+        reader: any SeriesListReader, catalog: any SeriesSetupCatalog,
+        edition: any CurrentEdition = FixedEdition.unlocked
+    ) {
         self.reader = reader
         self.catalog = catalog
+        self.edition = edition
+    }
+
+    public var isLocked: Bool {
+        _ = generation
+        return !edition.allows(.series)
     }
 
     public func reload() throws {
@@ -31,12 +43,12 @@ public final class SeriesListProjection: SeriesListQuery {
     }
 
     public var series: [SeriesRow] {
-        _ = generation
+        if isLocked { return [] }
         return entries.map { SeriesRow(id: $0.id, name: $0.name, setups: $0.setups.compactMap(choice)) }
     }
 
     public func setupChoices(including current: [SetupChoice]) -> [SetupChoice] {
-        _ = generation
+        if isLocked { return [] }
         let known = catalog.knownSetups().compactMap(choice)
         let knownSetups = Set(known.map(\.setup))
         return known + current.filter { !knownSetups.contains($0.setup) }
@@ -81,8 +93,14 @@ public final class SeriesUseCases: SeriesCommands {
 
     // MARK: CreateSeries (S39)
 
+    /// Series are paid (S39, S40): refused while Free → the upgrade offer (S52).
+    private func requireSeries() throws {
+        guard edition.allows(.series) else { throw UpgradeRequired(.series) }
+    }
+
     @discardableResult
     public func createSeries(name: String, setups: [SetupChoice]) throws -> UUID {
+        try requireSeries()
         let id = SeriesId(newID())
         let series = try Series.create(id: id, name: SeriesName.create(name).get(), setups: setups.map(\.setup)).get()
         try commit(series)
@@ -93,6 +111,7 @@ public final class SeriesUseCases: SeriesCommands {
 
     /// The sheet's result: the new name and the full set of setups.
     public func changeSeries(_ id: UUID, name: String, setups: [SetupChoice]) throws {
+        try requireSeries()
         guard let series = try repository.getById(SeriesId(id)) else { throw SeriesError.deleted(SeriesId(id)) }
         let wanted = setups.map(\.setup)
         guard !wanted.isEmpty else { throw SeriesError.noSetups }
@@ -107,11 +126,12 @@ public final class SeriesUseCases: SeriesCommands {
     // MARK: DeleteSeries (S40)
 
     public func deleteSeries(_ id: UUID) throws {
+        try requireSeries()
         guard let series = try repository.getById(SeriesId(id)) else { return }  // already gone
         try commit(series.delete().get())
     }
 
-    // MARK: Policies
+    // MARK: Policies (run whatever the edition: S33, S42 never wait for an unlock)
 
     /// RepointSeriesOnMerge (S33): the folded-in player's setups now name the kept player.
     public func repointSeriesOnMerge(kept: UUID, foldedIn: UUID) throws {
@@ -129,9 +149,16 @@ public final class SeriesUseCases: SeriesCommands {
 
     /// Subscribes both policies to Players' published events. Any player event also refreshes the
     /// names and colours the list shows. A failure is kept in `lastError`, never thrown into Players.
+    /// `AppUnlocked` / `AppLocked` refresh the list so it opens up or locks straight away.
     public func subscribe(to dispatcher: EventDispatcher) {
         dispatcher.subscribe(PlayerEventPublished.self) { [weak self] event in
             MainActor.assumeIsolated { self?.receive(event) }
+        }
+        dispatcher.subscribe(AppUnlockedPublished.self) { [weak self] _ in
+            MainActor.assumeIsolated { self?.list.refresh() }
+        }
+        dispatcher.subscribe(AppLockedPublished.self) { [weak self] _ in
+            MainActor.assumeIsolated { self?.list.refresh() }
         }
     }
 

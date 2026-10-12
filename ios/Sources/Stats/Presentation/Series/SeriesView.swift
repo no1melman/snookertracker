@@ -45,7 +45,12 @@ public struct SeriesView: View {
     public var body: some View {
         let rows = ports?.list.series ?? []
         Group {
-            if rows.isEmpty {
+            if isLocked {
+                LockedFeatureView(
+                    title: "Series", systemImage: "square.stack.3d.up",
+                    message: "Series and their monthly summaries come with the upgrade. Any series you made are kept.",
+                    upgrade: upgrade)
+            } else if rows.isEmpty {
                 ContentUnavailableView {
                     Label("No Series Yet", systemImage: "square.stack.3d.up")
                 } description: {
@@ -78,11 +83,16 @@ public struct SeriesView: View {
         }
         .navigationTitle("Series")
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("New Series", systemImage: "plus") { editing = SeriesDraft() }
+            if !isLocked {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("New Series", systemImage: "plus") { editing = SeriesDraft() }
+                }
             }
         }
-        .onAppear { ports?.list.refresh() }
+        .onAppear {
+            ports?.list.refresh()
+            if isLocked { upgrade() }
+        }
         .navigationDestination(item: $summaryFor) { id in
             MonthlySummaryView(series: id)
         }
@@ -92,13 +102,20 @@ public struct SeriesView: View {
         .confirmationDialog("Delete this series?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
                             titleVisibility: .visible, presenting: deleting) { row in
             Button("Delete Series", role: .destructive) {
-                attempt($error) { try ports?.commands.deleteSeries(row.id) }
+                do { try ports?.commands.deleteSeries(row.id) }
+                catch let refused as UpgradeRequired { upgradeOffer(refused.feature) }
+                catch { self.error = error.localizedDescription }
             }
         } message: { row in
             Text("\u{201C}\(row.name)\u{201D} is deleted. Its matches are kept, in History and in the stats.")
         }
         .errorAlert($error)
     }
+
+    /// Series are paid (S39, S40): while Free the screen opens the generic upgrade offer (S52).
+    private var isLocked: Bool { ports?.list.isLocked ?? false }
+    private func upgrade() { upgradeOffer(.series) }
+    private func upgradeOffer(_ feature: PaidFeature) { ports?.showUpgradeOffer(feature) }
 }
 
 /// A series row: name, then its setups' players.
@@ -215,6 +232,9 @@ struct SeriesEditor: View {
                 try commands.createSeries(name: draft.name, setups: draft.setups)
             }
             dismiss()
+        } catch let refused as UpgradeRequired {
+            dismiss()
+            ports?.showUpgradeOffer(refused.feature)
         } catch {
             self.error = error.localizedDescription
         }
