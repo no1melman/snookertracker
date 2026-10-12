@@ -33,6 +33,8 @@ final class AppContainer {
     let upgrade: UpgradeUseCases
     /// S52: where a refused paid feature lands; the offer UI presents `request`.
     let upgradeOffers: UpgradeOfferRouter
+    /// S53: the hub's benefits menu item, visible only while Free.
+    let benefitsMenuItem: BenefitsMenuItem
     let players: PlayersService
     let matchSettings: MatchSettingsService
     let liveMatches: LiveMatchesProjection
@@ -76,6 +78,8 @@ final class AppContainer {
         edition = try StoredEdition(store: SQLiteEditionStore(db: db))
         upgrade = UpgradeUseCases(store: edition, appStore: appStore, dispatcher: dispatcher)
         upgradeOffers = UpgradeOfferRouter(edition: edition)
+        benefitsMenuItem = BenefitsMenuItem(edition: edition)
+        benefitsMenuItem.subscribe(to: dispatcher)
         let playerRepository = try SQLitePlayerRepository(db: db)
         players = try PlayersService(
             repository: playerRepository, reader: playerRepository, meStore: SQLiteMeSettingStore(db: db),
@@ -198,7 +202,7 @@ final class AppContainer {
         { [upgradeOffers] feature in upgradeOffers.show(feature) }
     }
 
-    var upgradePorts: UpgradePorts { UpgradePorts(edition: edition, commands: upgrade) }
+    var upgradePorts: UpgradePorts { UpgradePorts(edition: edition, commands: upgrade, menuItem: benefitsMenuItem) }
 
     var playersPorts: PlayersPorts {
         PlayersPorts(list: players, commands: players, edition: edition, showUpgradeOffer: showUpgradeOffer)

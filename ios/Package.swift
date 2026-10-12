@@ -80,6 +80,14 @@ targets.append(.testTarget(
                    "MatchesInfrastructure", "MatchesPublished", "PlayersPublished", "UpgradePublished", "EventDispatch", "SQLiteSupport"],
     path: "Tests/Stats/ContractTests"))
 
+// Upgrade's screens (spec 029), and the unlock-then-revoke round trip over every context's real
+// SQLite stores: nothing is deleted or rewritten when the edition changes (ADR-0010).
+targets.append(.testTarget(
+    name: "UpgradeScreensTests",
+    dependencies: ["UpgradePresentation", "EventDispatch", "SQLiteSupport"]
+        + contexts.flatMap { c in ["Application", "Infrastructure", "Published"].map { Target.Dependency(stringLiteral: "\(c)\($0)") } },
+    path: "Tests/Upgrade/ScreensTests"))
+
 // Composition root module: wires every context; the Xcode app target is a thin @main over it.
 targets.append(.target(
     name: "AppComposition",
