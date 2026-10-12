@@ -4,12 +4,14 @@ import PlayersPresentation
 import StatsApplication
 import StatsPresentation
 import SwiftUI
+import UpgradePresentation
 
 /// The hub (spec 022): root of one NavigationStack, large title, no tab bar.
 struct HubView: View {
     @Environment(\.playersPorts) private var players
     @Environment(\.matchesPorts) private var matches
     @Environment(\.statsPorts) private var stats
+    @Environment(\.upgradePorts) private var upgrade
     @State private var path = NavigationPath()
     let initialRoute: String?
 
@@ -32,6 +34,10 @@ struct HubView: View {
                     row(.series, "Series", "calendar")
                     row(.players, "Players", "person.2")
                     row(.settings, "Settings", "gearshape")
+                    // S53: only while Free; hidden on AppUnlocked, back on AppLocked.
+                    if upgrade?.menuItem?.isVisible == true {
+                        row(.upgrade, "Upgrade", "sparkles")
+                    }
                 }
 
                 if let me = players?.list.me {
@@ -69,6 +75,7 @@ struct HubView: View {
                 case .history: HistoryView()
                 case .stats: StatsView()
                 case .series: SeriesView()
+                case .upgrade: BenefitsScreen()
                 }
             }
             .navigationDestination(for: StatsRoute.self) { route in
@@ -89,6 +96,7 @@ struct HubView: View {
         case "history": path.append(HubDestination.history)
         case "stats": path.append(HubDestination.stats)
         case "series": path.append(HubDestination.series)
+        case "upgrade": path.append(HubDestination.upgrade)
         case "match":
             path.append(HubDestination.history)
             if let id = stats?.history.pastMatches(PastMatchesFilter()).first?.id { path.append(StatsRoute.match(id)) }
@@ -104,10 +112,11 @@ struct HubView: View {
 }
 
 enum HubDestination: Hashable {
-    case history, stats, series, players, settings, me
+    case history, stats, series, players, settings, me, upgrade
 
     var title: String {
         switch self {
+        case .upgrade: "Upgrade"
         case .history: "History"
         case .stats: "Stats"
         case .series: "Series"

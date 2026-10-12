@@ -24,6 +24,8 @@ public struct AppRoot: View {
     public var body: some View {
         let needsWelcome = container.players.me == nil
         HubView(initialRoute: initialRoute)
+            // S52: only a refused paid feature sets a request, so this never opens on launch.
+            .upgradeOfferPresentation(container.upgradeOffers)
             .environment(\.matchesPorts, container.matchesPorts)
             .environment(\.playersPorts, container.playersPorts)
             .environment(\.statsPorts, container.statsPorts)
