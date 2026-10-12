@@ -188,10 +188,14 @@ final class AppContainer {
         #endif
     }
 
-    /// The App Store seam (ADR-0011's anti-corruption layer). Spec 028 replaces the fake with the
-    /// StoreKit 2 adapter here; nothing else in the app knows which one runs.
+    /// The App Store seam (ADR-0011's anti-corruption layer): the StoreKit 2 adapter (spec 028);
+    /// tests and previews pass `FakeAppStore`. Nothing else in the app knows which one runs.
     nonisolated static func makeAppStore() -> any AppStorePort {
+        #if canImport(StoreKit)
+        StoreKitAppStore()
+        #else
         FakeAppStore(purchaseOutcome: .purchased)
+        #endif
     }
 
     /// Application Support/SnookerTracker/SnookerTracker.sqlite
