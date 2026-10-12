@@ -1,5 +1,5 @@
 ---
-status: complete
+status: in-progress
 created: 2026-10-12
 priority: high
 tags:
@@ -12,13 +12,15 @@ depends_on:
 - '22'
 parent: '1'
 created_at: 2026-10-12T15:13:40.476709Z
-updated_at: 2026-10-12T15:36:53.326602Z
+updated_at: 2026-10-12T15:38:17.561364Z
 completed_at: 2026-10-12T15:36:53.326602Z
 transitions:
 - status: in-progress
   at: 2026-10-12T15:27:58.361175Z
 - status: complete
   at: 2026-10-12T15:36:53.326602Z
+- status: in-progress
+  at: 2026-10-12T15:38:17.561364Z
 ---
 # Upgrade screens
 
