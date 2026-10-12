@@ -118,7 +118,7 @@ public struct StatsView: View {
     private func pointOfViewHeader(_ report: StatsReport) -> some View {
         HStack(spacing: 6) {
             if let p = report.pointOfView {
-                PlayerPlate(name: p.name, colour: PlayerColour.color(p.colour), archived: p.isArchived)
+                PlayerPlate(name: p.name, colour: p.plateColour, archived: p.isArchived)
                     .textCase(nil)
             }
             if let summary = narrowing.summary { Text("· " + summary).textCase(nil) }
@@ -166,7 +166,7 @@ public struct StatsView: View {
                 Section {
                     ForEach(players) { p in
                         Button { chosenPlayer = p.id } label: {
-                            PlayerPlate(name: p.name, colour: PlayerColour.color(p.colour), archived: p.isArchived)
+                            PlayerPlate(name: p.name, colour: p.plateColour, archived: p.isArchived)
                         }
                     }
                 } header: {
@@ -327,7 +327,7 @@ struct FocusCard: View {
             HStack {
                 if let opponent {
                     Text("v").foregroundStyle(.secondary)
-                    PlayerPlate(name: title, colour: PlayerColour.color(opponent.colour), archived: opponent.isArchived)
+                    PlayerPlate(name: title, colour: opponent.plateColour, archived: opponent.isArchived)
                         .font(.title3.weight(.semibold))
                 } else {
                     Text(title).font(.title3.weight(.semibold))
@@ -386,7 +386,7 @@ struct ContextRow: View {
     var body: some View {
         HStack {
             if let opponent {
-                PlayerPlate(name: title, colour: PlayerColour.color(opponent.colour), archived: opponent.isArchived)
+                PlayerPlate(name: title, colour: opponent.plateColour, archived: opponent.isArchived)
             } else {
                 Text(title)
             }

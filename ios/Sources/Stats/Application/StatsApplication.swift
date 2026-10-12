@@ -228,11 +228,18 @@ public final class MatchRecordsProjection: MatchHistoryQuery {
     }
 
     /// The player shown for a side: merges followed to the kept player; current name and colour.
+    /// Free: the colour is left out (read time only; nothing stored changes, ADR-0010).
     func resolve(_ side: MatchRecord.Side) -> (player: StatsPlayer, view: HistoryPlayer) {
         var p = players[side.player] ?? StatsPlayer(id: side.player, name: "Unknown player", colour: side.colour)
         var hops = 0
         while let next = p.mergedInto, let kept = players[next], hops < 16 { p = kept; hops += 1 }
-        return (p, HistoryPlayer(id: p.id, name: p.name, colour: p.colour, isArchived: p.isArchived))
+        return (p, shown(p))
+    }
+
+    /// A player as the reads show them: Free leaves the colour out (no colours).
+    func shown(_ p: StatsPlayer) -> HistoryPlayer {
+        HistoryPlayer(id: p.id, name: p.name, colour: p.colour, isArchived: p.isArchived)
+            .showing(colours: !locks(.colours))
     }
 
     private func row(_ r: MatchRecord, _ a: HistoryPlayer, _ b: HistoryPlayer) -> PastMatchRow {

@@ -251,9 +251,9 @@ struct SetupToggleRow: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 10) {
-                        PlayerPlate(name: choice.first.name, colour: PlayerColour.color(choice.first.colour), archived: choice.first.isArchived)
+                        PlayerPlate(name: choice.first.name, colour: choice.first.plateColour, archived: choice.first.isArchived)
                         Text("v").font(.subheadline).foregroundStyle(.secondary)
-                        PlayerPlate(name: choice.second.name, colour: PlayerColour.color(choice.second.colour), archived: choice.second.isArchived)
+                        PlayerPlate(name: choice.second.name, colour: choice.second.plateColour, archived: choice.second.isArchived)
                     }
                     .font(.body.weight(.semibold))
                     Text(choice.details).font(.subheadline).foregroundStyle(.secondary)

@@ -54,9 +54,11 @@ public final class SeriesListProjection: SeriesListQuery {
         return known + current.filter { !knownSetups.contains($0.setup) }
     }
 
+    /// Free: no colours (left out at read time, ADR-0010).
     private func choice(_ setup: Setup) -> SetupChoice? {
         guard let a = catalog.player(setup.first), let b = catalog.player(setup.second) else { return nil }
-        return SetupChoice(setup: setup, first: a, second: b)
+        let colours = edition.allows(.colours)
+        return SetupChoice(setup: setup, first: a.showing(colours: colours), second: b.showing(colours: colours))
     }
 }
 

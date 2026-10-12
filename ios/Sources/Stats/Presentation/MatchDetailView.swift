@@ -149,7 +149,7 @@ public struct MatchDetailView: View {
                 .font(.system(size: 56, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(t.match.winner == nil || t.match.winner == p.id ? .primary : .secondary)
-            PlayerPlate(name: p.name, colour: PlayerColour.color(p.colour), archived: p.isArchived)
+            PlayerPlate(name: p.name, colour: p.plateColour, archived: p.isArchived)
                 .font(.headline)
         }
         .frame(maxWidth: .infinity)
@@ -217,7 +217,7 @@ private struct FrameRow: View {
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 24, alignment: .leading)
             VStack(alignment: .leading, spacing: 3) {
-                PlayerPlate(name: frame.winner.name, colour: PlayerColour.color(frame.winner.colour), archived: frame.winner.isArchived)
+                PlayerPlate(name: frame.winner.name, colour: frame.winner.plateColour, archived: frame.winner.isArchived)
                     .font(.body.weight(.medium))
                 Text("\(clockText(frame.frameTime)) frame · at \(clockText(frame.matchTime))")
                 .font(.caption)
@@ -310,7 +310,7 @@ private struct ScoreCorrectionSheet: View {
             let value = isFirst ? $scores[i].first : $scores[i].second
             Stepper(value: value, in: 0...999) {
                 HStack {
-                    PlayerPlate(name: player.name, colour: PlayerColour.color(player.colour), archived: player.isArchived)
+                    PlayerPlate(name: player.name, colour: player.plateColour, archived: player.isArchived)
                     Spacer()
                     Text(value.wrappedValue, format: .number).font(.title3.weight(.semibold)).monospacedDigit()
                 }

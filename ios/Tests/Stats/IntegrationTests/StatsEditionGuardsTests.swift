@@ -215,6 +215,49 @@ struct StatsEditionGuardsTests {
         #expect(relaunched.stats.pastMatches(PastMatchesFilter()).count == visible)
     }
 
+    @Test func freeLeavesColoursOutOfEveryRead() throws {
+        let world = try World()
+        let id = world.play([callum, asher, callum, callum])
+
+        let row = try #require(world.stats.pastMatches(PastMatchesFilter()).first)
+        #expect(!row.first.showsColour && !row.second.showsColour)
+        let timeline = try #require(world.stats.timeline(id))
+        #expect(!timeline.match.first.showsColour && !timeline.match.second.showsColour)
+        #expect(timeline.frames.allSatisfy { !$0.winner.showsColour && $0.breaker?.showsColour != true })
+        #expect(world.stats.statsPlayers(includeArchived: true).allSatisfy { !$0.showsColour })
+        #expect(world.stats.statsChoices(for: callum, includeArchivedPlayers: true).opponents.allSatisfy { !$0.showsColour })
+        // Read time only: the stored colours are kept.
+        #expect(Set(try world.store.allPlayers().map(\.colour)) == ["blue", "orange"])
+        #expect(try world.store.allRecords().first?.first.colour == "blue")
+    }
+
+    @Test func unlockShowsColoursAgainWithNoRebuild() throws {
+        let world = try World()
+        let id = world.play([callum, asher, callum, callum])
+        let writes = world.store.recordWrites
+
+        world.unlock()
+
+        #expect(world.store.recordWrites == writes && world.store.rebuilds == 0)
+        let row = try #require(world.stats.pastMatches(PastMatchesFilter()).first)
+        #expect(row.first.colour == "blue" && row.second.colour == "orange")
+        let timeline = try #require(world.stats.timeline(id))
+        #expect(timeline.frames.allSatisfy { $0.winner.showsColour })
+        #expect(Set(world.stats.statsPlayers(includeArchived: true).map(\.colour)) == ["blue", "orange"])
+        let report = world.stats.stats(StatsFilter(pointOfView: callum, grouping: .opponent))
+        #expect(report.pointOfView?.colour == "blue" && report.groups.first?.opponent?.colour == "orange")
+    }
+
+    @Test func revokingHidesColoursAgain() throws {
+        let world = try World(edition: .unlocked)
+        world.play([callum, asher, callum, callum])
+        #expect(world.stats.pastMatches(PastMatchesFilter()).first?.first.colour == "blue")
+
+        world.edition.status = .free
+        world.dispatcher.dispatch([AppLockedPublished(occurredAt: t0)])
+        #expect(world.stats.pastMatches(PastMatchesFilter()).first?.first.showsColour == false)
+    }
+
     @Test func anUnlockRefreshesObservingViews() throws {
         let world = try World()
         world.playMany(visible + 1)

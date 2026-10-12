@@ -140,7 +140,7 @@ struct PastMatchRowView: View {
     private func side(_ player: HistoryPlayer, frames: Int, sets: Int?) -> some View {
         let won = row.winner == player.id
         return HStack {
-            PlayerPlate(name: player.name, colour: PlayerColour.color(player.colour), archived: player.isArchived)
+            PlayerPlate(name: player.name, colour: player.plateColour, archived: player.isArchived)
                 .font(.headline.weight(won ? .bold : .regular))
             if won {
                 Image(systemName: "trophy.fill")

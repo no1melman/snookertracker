@@ -62,5 +62,6 @@ Enforce the Free limits on Stats reads and `Series`, reading `CurrentEdition` (U
   - The projection and the series list subscribe to `AppUnlocked` and `AppLocked` only to bump an observed counter, so open screens re-read under the new edition. Nothing is rebuilt.
   - A month skipped while Free isn't recorded in the summary log, so the first run after an unlock still issues the previous month's summary.
   - `MonthlySummary` reads through `Stats(filter)`, so it has no figures while Free. Only the locked Series screen reaches it.
+- **Follow-up (2026-10-12): no colours while Free.** Stats' reads leave player colours out while Free, as Matches does: `HistoryPlayer.colour` is `noColour` (empty, `showsColour` false) in History rows, the timeline, `statsPlayers`, `statsChoices`, Stats groups and series setup choices. Read time only: the stored colours and records are unchanged, so unlocking shows them again with no rebuild. Stats screens draw a neutral plate (`plateColour`), and so does the hub's "Me" row (it now reads Players' `shownColour`). Covered by `StatsEditionGuardsTests` (Free, unlock, revoke).
 - **Remains:**
   - The live screen's greyed head-to-head (Matches edition guards spec).

@@ -56,12 +56,21 @@ public typealias StatsStore = StatsEventLog & MatchRecordStore & StatsPlayerStor
 public struct HistoryPlayer: Hashable, Sendable, Identifiable {
     public let id: UUID
     public let name: String
-    /// Palette key (DesignSystem `PlayerColour` raw value).
+    /// Palette key (DesignSystem `PlayerColour` raw value); `noColour` (empty) while Free, when
+    /// colours aren't shown. The stored colour is kept, just left out of the read (ADR-0010).
     public let colour: String
     public let isArchived: Bool
 
     public init(id: UUID, name: String, colour: String, isArchived: Bool) {
         self.id = id; self.name = name; self.colour = colour; self.isArchived = isArchived
+    }
+
+    public static let noColour = ""
+    public var showsColour: Bool { colour != Self.noColour }
+
+    /// As shown under an edition: the colour only when `colours` are shown (Free: none).
+    public func showing(colours: Bool) -> HistoryPlayer {
+        colours ? self : HistoryPlayer(id: id, name: name, colour: Self.noColour, isArchived: isArchived)
     }
 }
 

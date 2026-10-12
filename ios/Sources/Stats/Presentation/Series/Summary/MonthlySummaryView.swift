@@ -83,11 +83,11 @@ struct SummaryLineCard: View {
             HStack(spacing: 10) {
                 switch line.subject {
                 case .you(let me):
-                    PlayerPlate(name: "You", colour: PlayerColour.color(me.colour), archived: me.isArchived)
+                    PlayerPlate(name: "You", colour: me.plateColour, archived: me.isArchived)
                 case .pairing(let a, let b):
-                    PlayerPlate(name: a.name, colour: PlayerColour.color(a.colour), archived: a.isArchived)
+                    PlayerPlate(name: a.name, colour: a.plateColour, archived: a.isArchived)
                     Text("v").font(.subheadline).foregroundStyle(.secondary)
-                    PlayerPlate(name: b.name, colour: PlayerColour.color(b.colour), archived: b.isArchived)
+                    PlayerPlate(name: b.name, colour: b.plateColour, archived: b.isArchived)
                 }
                 Spacer(minLength: 8)
                 Text(StatsFormat.percent(f.winPercentage))

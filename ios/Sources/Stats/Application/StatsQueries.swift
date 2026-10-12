@@ -44,7 +44,7 @@ extension MatchRecordsProjection: StatsQuery, MatchStatsQueries {
     public func statsPlayers(includeArchived: Bool) -> [HistoryPlayer] {
         players.values
             .filter { !$0.isRemoved && $0.mergedInto == nil && (includeArchived || !$0.isArchived) }
-            .map { HistoryPlayer(id: $0.id, name: $0.name, colour: $0.colour, isArchived: $0.isArchived) }
+            .map(shown)
             .sorted { ($0.name.localizedLowercase, $0.id.uuidString) < ($1.name.localizedLowercase, $1.id.uuidString) }
     }
 

@@ -46,7 +46,7 @@ struct HubView: View {
                             HStack {
                                 Label("Me", systemImage: "person.crop.circle")
                                 Spacer()
-                                PlayerPlate(name: me.name, colour: PlayerColour.color(me.colour))
+                                PlayerPlate(name: me.name, colour: me.shownColour.map(PlayerColour.color) ?? .secondary)
                                     .foregroundStyle(.secondary)
                             }
                         }
