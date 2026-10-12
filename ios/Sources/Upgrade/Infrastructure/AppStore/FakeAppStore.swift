@@ -2,8 +2,7 @@ import Foundation
 import UpgradeApplication
 import UpgradeDomain
 
-/// An in-memory `AppStorePort`: the tests' App Store, and the app's until the StoreKit adapter
-/// (spec 028) replaces it in the composition root.
+/// An in-memory `AppStorePort` for tests and previews; the app runs `StoreKitAppStore` (spec 028).
 ///
 /// A `purchased` purchase and an approved Ask to Buy both put the unlock on record, so a later
 /// restore finds it. `transactionUpdates` can be iterated once per instance (like StoreKit's).

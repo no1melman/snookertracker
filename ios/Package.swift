@@ -80,6 +80,14 @@ targets.append(.testTarget(
                    "MatchesInfrastructure", "MatchesPublished", "PlayersPublished", "UpgradePublished", "EventDispatch", "SQLiteSupport"],
     path: "Tests/Stats/ContractTests"))
 
+// StoreKit adapter (spec 028): StoreKit appears only in Upgrade's infrastructure adapter, the
+// configuration file sells the one unlock, only verified transactions count. The StoreKitTest suite
+// needs an app host, so it runs under xcodebuild (Tests/Upgrade/StoreKitAppTests, project.yml).
+targets.append(.testTarget(
+    name: "UpgradeStoreKitTests",
+    dependencies: ["UpgradeDomain", "UpgradeApplication", "UpgradeInfrastructure", "UpgradePublished", "EventDispatch", "SQLiteSupport"],
+    path: "Tests/Upgrade/StoreKitTests"))
+
 // Composition root module: wires every context; the Xcode app target is a thin @main over it.
 targets.append(.target(
     name: "AppComposition",

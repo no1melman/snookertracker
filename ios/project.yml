@@ -43,6 +43,27 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         MARKETING_VERSION: "0.1"
         CURRENT_PROJECT_VERSION: "1"
+    # Local runs buy the unlock from the StoreKit configuration file, not the App Store (spec 028).
+    scheme:
+      testTargets:
+        - SnookerTrackerStoreKitTests
+      storeKitConfiguration: StoreKit/SnookerTracker.storekit
+  # StoreKit adapter against StoreKitTest's local App Store (spec 028). App-hosted: SKTestSession can't
+  # reach the StoreKit test service from `swift test`.
+  SnookerTrackerStoreKitTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/Upgrade/StoreKitAppTests
+    dependencies:
+      - target: SnookerTracker
+      - package: SnookerTracker
+        product: AppComposition
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.melman.snookertracker.StoreKitTests
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
   # Live Activity UI (spec 018). No App Group, no push: it renders ActivityKit content the app sends.
   LiveActivityWidget:
     type: app-extension
