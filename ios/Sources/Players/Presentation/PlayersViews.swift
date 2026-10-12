@@ -27,6 +27,41 @@ public extension EnvironmentValues {
     @Entry var playersPorts: PlayersPorts? = nil
 }
 
+extension PlayersPorts {
+    /// Colours are paid (S22): no colour plates or Colour action while Free.
+    @MainActor var showsColours: Bool { edition.allows(.colours) }
+
+    /// Whether one more active player fits the Free cap (read from `FreeLimits`); always once Unlocked.
+    @MainActor var roomForAnotherActivePlayer: Bool {
+        guard let limits = edition.limits else { return true }
+        return limits.allowsAnotherActivePlayer(activeCount: list.players.filter { !$0.isArchived }.count)
+    }
+}
+
+/// Runs `command`; an edition refusal opens the upgrade offer (S52), any other lands in `message`.
+@MainActor func attempt(_ message: Binding<String?>, offer: ShowUpgradeOfferAction?, _ command: () throws -> Void) {
+    do { try command() } catch let refused as UpgradeRequired {
+        offer?(refused.feature)
+    } catch {
+        message.wrappedValue = error.localizedDescription
+    }
+}
+
+/// A player's name with their colour plate, or the plain name while colours are omitted (Free).
+struct PlayerLabel: View {
+    let player: PlayerListItem
+
+    var body: some View {
+        if let colour = player.shownColour {
+            PlayerPlate(name: player.name, colour: PlayerColour.color(colour), archived: player.isArchived)
+        } else {
+            Text(player.name)
+                .lineLimit(1)
+                .foregroundStyle(player.isArchived ? .secondary : .primary)
+        }
+    }
+}
+
 /// The Players screen (spec 011, ADR-0008): Active and Archived sections, add, and per row:
 /// - swipe an active player → Archive (no confirmation: Unarchive reverses it);
 /// - swipe an archived player → Remove (a confirmation stating the matches deleted, only when there are any);
@@ -62,7 +97,14 @@ public struct PlayersView: View {
         }
         .navigationTitle("Players")
         .toolbar {
-            Button("Add Player", systemImage: "plus") { editing = .add }
+            Button("Add Player", systemImage: "plus") {
+                // S3: at the Free cap, adding opens the upgrade offer instead of the editor.
+                if let ports, !ports.roomForAnotherActivePlayer {
+                    ports.showUpgradeOffer(.extraPlayers)
+                } else {
+                    editing = .add
+                }
+            }
         }
         .sheet(item: $editing) { mode in
             NavigationStack { PlayerEditor(mode: mode) }
@@ -77,7 +119,7 @@ public struct PlayersView: View {
     private func row(_ player: PlayerListItem) -> some View {
         Button { editing = .edit(player) } label: {
             HStack {
-                PlayerPlate(name: player.name, colour: PlayerColour.color(player.colour), archived: player.isArchived)
+                PlayerLabel(player: player)
                 if player.id == ports?.list.me?.id {
                     Text("Me").font(.subheadline).foregroundStyle(.secondary)
                 }
@@ -100,10 +142,13 @@ public struct PlayersView: View {
         }
         .contextMenu {
             Button("Rename", systemImage: "pencil") { editing = .edit(player) }
-            Button("Colour", systemImage: "paintpalette") { editing = .edit(player) }
+            if ports?.showsColours == true {
+                Button("Colour", systemImage: "paintpalette") { editing = .edit(player) }
+            }
             if player.isArchived {
                 Button("Unarchive", systemImage: "arrow.uturn.backward") {
-                    attempt($error) { try ports?.commands.unarchivePlayer(player.id) }
+                    // S35: at the Free cap this opens the upgrade offer.
+                    attempt($error, offer: ports?.showUpgradeOffer) { try ports?.commands.unarchivePlayer(player.id) }
                 }
                 Button("Remove", systemImage: "trash", role: .destructive) { requestRemoval(of: player) }
             } else {
@@ -185,7 +230,7 @@ struct MergePicker: View {
             Section {
                 ForEach(candidates) { player in
                     Button { kept = player } label: {
-                        PlayerPlate(name: player.name, colour: PlayerColour.color(player.colour))
+                        PlayerLabel(player: player)
                             .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
                             .contentShape(Rectangle())
                     }
@@ -251,14 +296,17 @@ struct PlayerEditor: View {
             Section("Name") {
                 TextField("Name", text: $name).nameEntry().onSubmit(save)
             }
-            Section("Colour") {
-                ColourGrid(selection: $colour)
-            }
-            Section {
-                PlayerPlate(name: name.isEmpty ? "Name" : name, colour: colour.color)
-                    .font(.title3.weight(.semibold))
-            } header: {
-                Text("Preview")
+            // S22: colours are paid; while Free there is no picker and no plate (the colour is kept).
+            if ports?.showsColours == true {
+                Section("Colour") {
+                    ColourGrid(selection: $colour)
+                }
+                Section {
+                    PlayerPlate(name: name.isEmpty ? "Name" : name, colour: colour.color)
+                        .font(.title3.weight(.semibold))
+                } header: {
+                    Text("Preview")
+                }
             }
         }
         .navigationTitle(isAdd ? "New Player" : "Edit Player")
@@ -311,6 +359,10 @@ struct PlayerEditor: View {
             // S2/S3/S32: the name is an archived player's; offer to remove them (S42).
             offeringRemoval = ports?.list.players.first { $0.id == archived }
             if offeringRemoval == nil { error = PlayerCommandError.unknownPlayer.localizedDescription }
+        } catch let refused as UpgradeRequired {
+            // S52: close the editor so the upgrade offer can show.
+            dismiss()
+            ports?.showUpgradeOffer(refused.feature)
         } catch {
             self.error = error.localizedDescription
         }
@@ -371,7 +423,7 @@ public struct MeView: View {
                 attempt($error) { try ports?.commands.setMe(player.id) }
             } label: {
                 HStack {
-                    PlayerPlate(name: player.name, colour: PlayerColour.color(player.colour))
+                    PlayerLabel(player: player)
                     Spacer()
                     if player.id == ports?.list.me?.id {
                         Image(systemName: "checkmark").foregroundStyle(Color.accentColor)

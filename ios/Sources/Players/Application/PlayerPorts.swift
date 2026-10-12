@@ -8,25 +8,38 @@ public typealias PlayerID = UUID
 public struct PlayerListItem: Identifiable, Hashable, Sendable {
     public let id: PlayerID
     public var name: String
-    /// Palette key (DesignSystem `PlayerColour` raw value).
+    /// The stored palette key (DesignSystem `PlayerColour` raw value), kept whatever the edition: the
+    /// composition root supplies it to Matches (recorded at match start) and Stats, which hide colours
+    /// on their own while Free (ADR-0011). Players' own screens show `shownColour`.
     public var colour: String
+    /// The colour as `PlayersList` and `PlayerSuggestions` show it: omitted (nil) while Free (S22), the
+    /// stored `colour` once Unlocked.
+    public var shownColour: String?
     public var isArchived: Bool
 
     public init(id: PlayerID, name: String, colour: String, isArchived: Bool = false) {
         self.id = id
         self.name = name
         self.colour = colour
+        self.shownColour = colour
         self.isArchived = isArchived
+    }
+
+    /// This row with its shown colour omitted unless `shown`.
+    public func showingColour(_ shown: Bool) -> PlayerListItem {
+        var row = self
+        row.shownColour = shown ? colour : nil
+        return row
     }
 }
 
 /// `PlayersList`, `PlayerSuggestions` + `MeView`.
 @MainActor public protocol PlayersListQuery: AnyObject, Sendable {
-    /// All players, active first, then by name.
+    /// All players, active first, then by name; `shownColour` omitted while Free.
     var players: [PlayerListItem] { get }
     var me: PlayerListItem? { get }
     /// `PlayerSuggestions(prefix)`: active players whose name starts with `prefix`, case-insensitively.
-    /// A blank prefix suggests every active player.
+    /// A blank prefix suggests every active player. `shownColour` omitted while Free.
     func suggestions(prefix: String) -> [PlayerListItem]
     /// Matches (any status but deleted) the player is in: removing asks first when > 0 (ADR-0008).
     func matchCount(of player: PlayerID) -> Int

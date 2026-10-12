@@ -64,6 +64,10 @@ public final class SQLitePlayerRepository: PlayerRepository, PlayersListReader {
         return palette.nextUnusedColour(given: used)
     }
 
+    public func countActive() throws -> Int {
+        try db.query("SELECT COUNT(*) AS n FROM players WHERE status = 'active'").first?.int("n") ?? 0
+    }
+
     public func list() throws -> [PlayerListItem] {
         try db.query("""
             SELECT id, name, colour, status FROM players WHERE status IN ('active', 'archived')
