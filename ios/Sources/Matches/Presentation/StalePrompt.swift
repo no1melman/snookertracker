@@ -2,6 +2,7 @@ import DesignSystem
 import Foundation
 import MatchesApplication
 import SwiftUI
+import UpgradePublished
 
 public extension View {
     /// The stale-match prompt (S28, spec 020): a sheet for each stale match in turn, until the queue
@@ -35,6 +36,9 @@ struct StalePromptSheet: View {
     /// The end choice that was refused short of the target: ask before finishing anyway.
     @State private var finishAnyway: StaleChoice?
     @State private var error: String?
+    @Environment(\.matchesPorts) private var ports
+    /// Free: no colours shown (ADR-0010).
+    private var showsColours: Bool { ports?.edition.allows(.colours) ?? true }
 
     init(prompt: StaleMatchPrompt, queue: StaleMatchQueue) {
         self.prompt = prompt
@@ -48,7 +52,7 @@ struct StalePromptSheet: View {
                 Section {
                     ForEach(prompt.sides) { side in
                         HStack {
-                            PlayerPlate(name: side.name, colour: PlayerColour.color(side.colour))
+                            PlayerPlate(name: side.name, colour: showsColours ? PlayerColour.color(side.colour) : .secondary)
                                 .font(.headline)
                             Spacer(minLength: 8)
                             ScoreNumeral(side.frames)

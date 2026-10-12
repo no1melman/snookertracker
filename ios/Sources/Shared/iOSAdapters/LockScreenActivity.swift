@@ -19,7 +19,7 @@ import MatchesPublished
 
 /// Keeps the Live Activity in step with `LockScreenState` after every published match event.
 @MainActor
-public final class LockScreenActivity {
+public final class LockScreenActivity: LiveActivityPort {
     private let state: any LockScreenStateQuery
     private let presenter: any LockScreenPresenter
     private var shown: LockScreenState?
@@ -53,6 +53,14 @@ public final class LockScreenActivity {
             presenter.update(Self.content(next))
         }
         shown = next
+        synced = true
+    }
+
+    /// `AppLocked` (S51): ends the activity straight away. `LockScreenState` is none while Free, so
+    /// later refreshes keep it gone.
+    public func removeLiveActivity() {
+        if shown != nil || !synced { presenter.end() }
+        shown = nil
         synced = true
     }
 

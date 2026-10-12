@@ -1,6 +1,8 @@
+import EventDispatch
 import Foundation
 import MatchesDomain
 import Observation
+import UpgradePublished
 
 /// The live-match read models (spec 009): `LiveMatches` and `LiveMatchScreen`.
 ///
@@ -26,6 +28,7 @@ public final class LiveMatchesProjection: LiveMatchesQuery, LiveMatchScreenQuery
         let sides: [Side]
         let breaker: PlayerRef?
         let status: MatchStatus
+        let pauseKind: PauseKind?
         let matchTimer: TimerReading
         let frameTimer: TimerReading
         let targetReachedBy: PlayerRef?
@@ -36,9 +39,35 @@ public final class LiveMatchesProjection: LiveMatchesQuery, LiveMatchScreenQuery
 
     private let directory: any MatchPlayerDirectory
     private var rows: [MatchID: Row] = [:]
+    /// Upgrade's `CurrentEdition` (ADR-0011): while Free the reads omit colours, lock head-to-head
+    /// and pause, and offer no lock-screen state. Unlocked until the composition root hands it over.
+    @ObservationIgnored public let edition: any CurrentEdition
+    /// Bumped when the edition changes, so views reading these queries re-render (`CurrentEdition`
+    /// itself is not observable).
+    private var editionStamp = 0
 
-    public init(players: any MatchPlayerDirectory) {
+    public init(players: any MatchPlayerDirectory, edition: any CurrentEdition = FixedEdition.unlocked) {
         self.directory = players
+        self.edition = edition
+    }
+
+    /// The edition changed (`AppUnlocked` / `AppLocked`): every read is redrawn as it now applies.
+    public func editionChanged() { editionStamp += 1 }
+
+    /// Redraws on `AppUnlocked` and `AppLocked` (S49, S51).
+    public func subscribeToEdition(_ dispatcher: EventDispatcher) {
+        dispatcher.subscribe(AppUnlockedPublished.self) { [weak self] _ in
+            MainActor.assumeIsolated { self?.editionChanged() }
+        }
+        dispatcher.subscribe(AppLockedPublished.self) { [weak self] _ in
+            MainActor.assumeIsolated { self?.editionChanged() }
+        }
+    }
+
+    /// Free: no colours, so the colour-clash offer (S46) isn't made either.
+    private var showsColours: Bool {
+        _ = editionStamp
+        return edition.allows(.colours)
     }
 
     // MARK: Keeping it current
@@ -92,6 +121,7 @@ public final class LiveMatchesProjection: LiveMatchesQuery, LiveMatchScreenQuery
             ],
             breaker: m.nextBreaker?.player.ref,
             status: m.status,
+            pauseKind: m.pauseKind,
             matchTimer: timer(m.matchLength(at: now)),
             frameTimer: timer(m.frameLength(at: now)),
             targetReachedBy: m.status == .awaitingConfirmation ? (score.sets == nil ? leader : leaderBySets) : nil,
@@ -103,7 +133,8 @@ public final class LiveMatchesProjection: LiveMatchesQuery, LiveMatchScreenQuery
     // MARK: Queries
 
     public var liveMatches: [LiveMatchRow] {
-        rows.values.sorted { $0.startedAt < $1.startedAt }.map { row in
+        _ = editionStamp
+        return rows.values.sorted { $0.startedAt < $1.startedAt }.map { row in
             LiveMatchRow(id: row.id, sides: sides(row), matchTimer: row.matchTimer,
                          isPaused: row.status == .paused, startedAt: row.startedAt)
         }
@@ -111,6 +142,8 @@ public final class LiveMatchesProjection: LiveMatchesQuery, LiveMatchScreenQuery
 
     public func liveMatchScreen(_ id: MatchID) -> LiveMatchScreen? {
         guard let row = rows[id] else { return nil }
+        _ = editionStamp
+        let manualPause = edition.allows(.manualPause)
         let scoring: Set<MatchStatus> = [.inPlay, .awaitingConfirmation]
         let controls = LiveMatchScreen.Controls(
             chooseBreaker: row.status == .awaitingBreaker,
@@ -118,17 +151,23 @@ public final class LiveMatchesProjection: LiveMatchesQuery, LiveMatchScreenQuery
             removeFrom: scoring.contains(row.status) ? Set(row.sides.filter { $0.frames > 0 }.map(\.player)) : [],
             pause: row.status == .awaitingBreaker || row.status == .inPlay,
             resume: row.status == .paused,
-            correctBreaker: row.hasBreaker && (row.status == .inPlay || row.status == .paused))
+            correctBreaker: row.hasBreaker && (row.status == .inPlay || row.status == .paused),
+            pauseOffersUpgrade: !manualPause,
+            resumeOffersUpgrade: !manualPause && row.pauseKind == .byHand)
         return LiveMatchScreen(
             id: row.id, startedAt: row.startedAt, game: row.game, style: row.style, breakRule: row.breakRule,
             sides: sides(row), matchTimer: row.matchTimer, frameTimer: row.frameTimer,
             isPaused: row.status == .paused, controls: controls, targetReachedBy: row.targetReachedBy,
-            setWon: row.setWon, coloursClash: row.coloursClash)
+            setWon: row.setWon, coloursClash: row.coloursClash && showsColours,
+            showsColours: showsColours, headToHeadLocked: !edition.allows(.headToHead))
     }
 
+    /// Free: the colour is omitted (empty); it is kept on the match, just not shown (ADR-0010).
     private func sides(_ row: Row) -> [LiveSide] {
-        row.sides.map { side in
-            LiveSide(id: side.player, name: directory.player(side.player)?.name ?? "?", colour: side.colour,
+        let showsColours = showsColours
+        return row.sides.map { side in
+            LiveSide(id: side.player, name: directory.player(side.player)?.name ?? "?",
+                     colour: showsColours ? side.colour : LiveSide.noColour,
                      frames: side.frames, isBreaker: row.breaker == side.player, sets: side.sets)
         }
     }

@@ -52,14 +52,19 @@ extension EventDispatcher {
 public final class DeleteMatchesOnPlayerRemoved {
     private let repository: any MatchRepository
     private let commands: any MatchCommands
+    /// The cascade's deletion, never limited by the edition (S42).
+    private let delete: @MainActor (MatchID) throws -> Void
 
     public init(repository: any MatchRepository, commands: any MatchCommands) {
         self.repository = repository
         self.commands = commands
+        self.delete = { [commands] in try commands.deleteMatch($0) }
     }
 
-    public convenience init(matches: MatchUseCases) {
-        self.init(repository: matches.repository, commands: matches)
+    public init(matches: MatchUseCases) {
+        self.repository = matches.repository
+        self.commands = matches
+        self.delete = { [matches] in try matches.deleteOnPlayerRemoved($0) }
     }
 
     public func subscribe(to dispatcher: EventDispatcher) {
@@ -74,7 +79,7 @@ public final class DeleteMatchesOnPlayerRemoved {
         for match in matches where match.status != .deleted {
             guard let id = match.id.uuid else { continue }
             if match.status.isLive { try? commands.cancelMatch(id) }
-            try? commands.deleteMatch(id)
+            try? delete(id)
         }
     }
 }

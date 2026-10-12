@@ -50,8 +50,17 @@ public final class MatchUseCases: MatchCommands {
             game: request.game.domain, style: style, breakRule: request.breakRule.domain)
         else { throw MatchCommandError.samePlayerTwice }
 
-        let limit = settings.values.liveMatchLimit
-        guard limit.allowsAnother(liveCount: try repository.findLive().count) else {
+        let liveCount = try repository.findLive().count
+        // Free (S52): most frames wins, alternate breaks and one live match, from Upgrade's table.
+        if let free = edition.limits {
+            if !free.allows(Self.kind(of: request.style)) {
+                throw UpgradeRequired(request.style.isSets ? .sets : .raceTo)
+            }
+            if !free.allows(Self.kind(of: request.breakRule)) { throw UpgradeRequired(.winnerBreaks) }
+            if !free.allowsAnotherLiveMatch(liveCount: liveCount) { throw UpgradeRequired(.severalLiveMatches) }
+        }
+        let limit = settings.effectiveLiveMatchLimit  // Free: the Free limit whatever is stored (spec 026)
+        guard limit.allowsAnother(liveCount: liveCount) else {
             throw MatchCommandError.liveMatchLimitReached(limit.value)
         }
 
@@ -83,6 +92,8 @@ public final class MatchUseCases: MatchCommands {
     }
 
     public func overrideMatchColour(_ match: MatchID, of player: PlayerRef, to colour: String) throws {
+        // Not offered while Free (no colours shown, S46); refused should it be asked for anyway.
+        guard edition.allows(.colours) else { throw UpgradeRequired(.colours) }
         guard case .success(let colour) = Colour.create(colour) else { throw MatchCommandError.notAllowedNow }
         try change(match) { $0.overrideColour(of: PlayerId(ref: player), to: colour, at: $1) }
     }
@@ -95,11 +106,16 @@ public final class MatchUseCases: MatchCommands {
         try change(match) { $0.removeFrame(from: PlayerId(ref: player), at: $1) }
     }
 
+    /// Free: refused; the pause button shows "Upgrade now" (S7, S52). Auto-pause stays free.
     public func pauseMatch(_ match: MatchID) throws {
+        guard edition.allows(.manualPause) else { throw UpgradeRequired(.manualPause) }
         try change(match) { $0.pause(at: $1) }
     }
 
+    /// Free: refused for a match paused by hand; one auto-paused after a kill resumes free (S8, S27).
     public func resumeMatch(_ match: MatchID) throws {
+        guard let current = try repository.getById(match) else { throw MatchCommandError.notAllowedNow }
+        if current.pauseKind == .byHand, !edition.allows(.manualPause) { throw UpgradeRequired(.manualPause) }
         try change(match) { $0.resume(at: $1) }
     }
 
@@ -120,6 +136,7 @@ public final class MatchUseCases: MatchCommands {
     // MARK: FinishAllMatches (S43)
 
     public func finishAllMatchesPreview() throws -> FinishAllPreview {
+        guard edition.allows(.severalLiveMatches) else { throw UpgradeRequired(.severalLiveMatches) }
         let live = try repository.findLive()
         let abandoning = live.filter { isShortOfTarget($0) }.count
         return FinishAllPreview(finishing: live.count - abandoning, abandoning: abandoning)
@@ -127,6 +144,8 @@ public final class MatchUseCases: MatchCommands {
 
     /// Each match is its own transaction; a failure does not stop the rest, and the first is rethrown.
     public func finishAllMatches() throws {
+        // Paid (S43): Free has one live match.
+        guard edition.allows(.severalLiveMatches) else { throw UpgradeRequired(.severalLiveMatches) }
         var firstError: (any Error)?
         for match in try repository.findLive() {
             let at = now()
@@ -150,13 +169,30 @@ public final class MatchUseCases: MatchCommands {
 
     // MARK: Maintenance (spec 015)
 
+    /// The Scorer's deletion (S30). Free: only the newest ended matches (the visible ones).
     public func deleteMatch(_ match: MatchID) throws {
+        try guardVisibleWhileFree(match)
+        try deleteOnPlayerRemoved(match)
+    }
+
+    /// `DeleteMatch` for the removal cascade (S42): never limited by the edition.
+    public func deleteOnPlayerRemoved(_ match: MatchID) throws {
         try change(match) { $0.delete(at: $1) }
+    }
+
+    /// Free: corrections and Scorer deletions only for the newest `visibleEndedMatches` ended matches;
+    /// older ones are hidden, never changed (S17, S29, S30).
+    private func guardVisibleWhileFree(_ match: MatchID) throws {
+        guard let free = edition.limits else { return }
+        guard try repository.isAmongNewestEnded(match, free.visibleEndedMatches) else {
+            throw UpgradeRequired(.fullHistory)
+        }
     }
 
     /// One `MatchScoreCorrected` event: it is stored whole or not at all (Q1 default). A second
     /// correction builds on the first, and each is its own timeline entry (Q2 default).
     public func correctMatchScore(_ id: MatchID, to score: CorrectedScore, confirmed: Bool) throws {
+        try guardVisibleWhileFree(id)
         guard let match = try repository.getById(id) else { throw MatchCommandError.notAllowedNow }
         let correction = try score.domain(for: match.setup.style)
         switch match.correctScore(correction, at: now()) {
@@ -175,6 +211,22 @@ public final class MatchUseCases: MatchCommands {
     }
 
     // MARK: Plumbing
+
+    /// Matches' style and break rule in Upgrade's words (ADR-0011).
+    private static func kind(of style: MatchStyle) -> MatchStyleKind {
+        switch style {
+        case .mostFramesWins: .mostFramesWins
+        case .raceTo, .bestOf: .raceTo
+        case .sets: .sets
+        }
+    }
+
+    private static func kind(of rule: BreakRule) -> BreakRuleKind {
+        switch rule {
+        case .alternate: .alternate
+        case .winnerBreaks: .winnerBreaks
+        }
+    }
 
     private func change(_ id: MatchID, _ behaviour: (Match, Date) -> Result<Match, MatchError>) throws {
         guard let match = try repository.getById(id) else { throw MatchCommandError.notAllowedNow }

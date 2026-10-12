@@ -38,9 +38,11 @@ public struct LockScreenState: Hashable, Sendable {
 }
 
 /// `LockScreenState` is a view over the live-match projection: its oldest row, so the hand-over
-/// to the next-oldest happens as soon as the shown match leaves the projection.
+/// to the next-oldest happens as soon as the shown match leaves the projection. Unlocked only:
+/// none while Free (S47, ADR-0010), so no Live Activity is shown.
 extension LiveMatchesProjection: LockScreenStateQuery {
     public var lockScreenState: LockScreenState? {
+        guard edition.allows(.lockScreen) else { return nil }
         guard let oldest = liveMatches.first, let screen = liveMatchScreen(oldest.id) else { return nil }
         return LockScreenState(
             matchID: screen.id, sides: screen.sides, frameTimer: screen.frameTimer, isPaused: screen.isPaused,

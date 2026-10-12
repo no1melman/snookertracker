@@ -49,5 +49,18 @@ public enum MatchRoute: Hashable {
     case live(MatchID)
 }
 
+/// Runs a command; a Free refusal (`UpgradeRequired`) opens the upgrade offer (S52) through
+/// `ports.showUpgradeOffer`, any other error is shown in the alert.
+@MainActor
+func attemptOrOffer(_ message: Binding<String?>, _ ports: MatchesPorts?, _ command: () throws -> Void) {
+    do {
+        try command()
+    } catch let refused as UpgradeRequired {
+        ports?.showUpgradeOffer(refused.feature)
+    } catch {
+        message.wrappedValue = error.localizedDescription
+    }
+}
+
 /// VoiceOver score: "Asher 4, Me 3" (sets: "Asher 2 (1 set), Me 0 (0 sets)").
 func spokenScore(_ sides: [LiveSide]) -> String { spokenLiveScore(sides) }

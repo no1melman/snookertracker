@@ -43,7 +43,7 @@ public struct LiveMatchesSection: View {
                     Spacer()
                     // One live match is finished from its own row; Finish all is for several (S43).
                     if rows.count > 1 {
-                        Button("Finish All") { attempt($error) { finishAll = try ports?.commands.finishAllMatchesPreview() } }
+                        Button("Finish All") { attemptOrOffer($error, ports) { finishAll = try ports?.commands.finishAllMatchesPreview() } }
                             .font(.subheadline.weight(.semibold))
                             .textCase(nil)
                     }
@@ -51,7 +51,7 @@ public struct LiveMatchesSection: View {
             }
             .confirmationDialog(Self.finishAllTitle(finishAll), isPresented: Binding(get: { finishAll != nil }, set: { if !$0 { finishAll = nil } }),
                                 titleVisibility: .visible, presenting: finishAll) { _ in
-                Button("Finish All") { attempt($error) { try ports?.commands.finishAllMatches() } }
+                Button("Finish All") { attemptOrOffer($error, ports) { try ports?.commands.finishAllMatches() } }
             } message: { preview in
                 Text(Self.finishAllMessage(preview))
             }
@@ -109,7 +109,7 @@ struct LiveMatchRowView: View {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(row.sides) { side in
                     HStack {
-                        PlayerPlate(name: side.name, colour: PlayerColour.color(side.colour))
+                        PlayerPlate(name: side.name, colour: side.showsColour ? PlayerColour.color(side.colour) : .secondary)
                             .font(.headline)
                         Spacer(minLength: 8)
                         ScoreNumeral(side.frames)

@@ -1,6 +1,5 @@
 import DesignSystem
 import MatchesApplication
-import UpgradePublished
 import SwiftUI
 import UpgradePublished
 
@@ -211,6 +210,9 @@ public struct NewGameView: View {
             onStart(try ports.commands.startMatch(setup))
         } catch MatchCommandError.liveMatchLimitReached(let limit) {
             limitReached = limit
+        } catch let refused as UpgradeRequired {
+            // Free: a second live match, another style or break rule → the upgrade offer (S52).
+            ports.showUpgradeOffer(refused.feature)
         } catch {
             self.error = error.localizedDescription
         }

@@ -40,6 +40,10 @@ public protocol MatchRepository: Sendable {
     func findLive() throws -> [Match]
     /// Every match with that player, oldest started first.
     func findByPlayer(_ player: PlayerRef) throws -> [Match]
+    /// Whether `id` is an ended match (finished, abandoned or cancelled; not deleted) among the `n`
+    /// most recently ended, newest by start time as History lists them: the Free guard on corrections
+    /// and deletions (S29, S30). False for a live, deleted or unknown match.
+    func isAmongNewestEnded(_ id: MatchID, _ n: Int) throws -> Bool
 }
 
 /// What `MatchSettings` holds (spec 007): defaults for new matches and the live-match limit.

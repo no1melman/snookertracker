@@ -1,6 +1,7 @@
 import DesignSystem
 import MatchesApplication
 import SwiftUI
+import UpgradePublished
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -52,20 +53,31 @@ public struct LiveMatchView: View {
             }
             .padding(.horizontal)
             .frame(maxHeight: .infinity)
-            if let lookup = ports?.headToHead, screen.sides.count == 2 {
+            if screen.headToHeadLocked, screen.sides.count == 2 {
+                // Free (S14, S52): greyed, with an upgrade prompt instead of the figures.
+                LockedHeadToHeadStrip { ports?.showUpgradeOffer(.headToHead) }
+            } else if let lookup = ports?.headToHead, screen.sides.count == 2 {
                 let record = lookup(screen.sides[0].id, screen.sides[1].id)
                 if !record.isEmpty { HeadToHeadStrip(record: record, sides: screen.sides) }
             }
-            if screen.isPaused { pausedBar(commands) }
+            if screen.isPaused { pausedBar(screen, commands) }
         }
         .navigationTitle(screen.style.title)
         .inlineTitle()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 if screen.isPaused {
-                    Button("Resume", systemImage: "play.fill") { attempt($error) { try commands.resumeMatch(matchID) } }
+                    if screen.controls.resumeOffersUpgrade {
+                        Button("Upgrade now", systemImage: "lock.fill") { ports?.showUpgradeOffer(.manualPause) }
+                    } else {
+                        Button("Resume", systemImage: "play.fill") { attemptOrOffer($error, ports) { try commands.resumeMatch(matchID) } }
+                    }
+                } else if screen.controls.pauseOffersUpgrade {
+                    // Free (S7, S52): the pause button shows "Upgrade now" in place.
+                    Button("Upgrade now", systemImage: "lock.fill") { ports?.showUpgradeOffer(.manualPause) }
+                        .disabled(!screen.controls.pause)
                 } else {
-                    Button("Pause", systemImage: "pause.fill") { attempt($error) { try commands.pauseMatch(matchID) } }
+                    Button("Pause", systemImage: "pause.fill") { attemptOrOffer($error, ports) { try commands.pauseMatch(matchID) } }
                         .disabled(!screen.controls.pause)
                 }
             }
@@ -196,15 +208,21 @@ public struct LiveMatchView: View {
         .padding(.vertical, 12)
     }
 
-    private func pausedBar(_ commands: any MatchCommands) -> some View {
+    private func pausedBar(_ screen: LiveMatchScreen, _ commands: any MatchCommands) -> some View {
         VStack(spacing: 8) {
             Label("Paused", systemImage: "pause.circle.fill")
                 .font(.headline)
                 .foregroundStyle(.orange)
             Button {
-                attempt($error) { try commands.resumeMatch(matchID) }
+                // Free: a pause by hand can't be resumed (S8, S52); an automatic one can.
+                if screen.controls.resumeOffersUpgrade {
+                    ports?.showUpgradeOffer(.manualPause)
+                } else {
+                    attemptOrOffer($error, ports) { try commands.resumeMatch(matchID) }
+                }
             } label: {
-                Label("Resume", systemImage: "play.fill")
+                Label(screen.controls.resumeOffersUpgrade ? "Upgrade now" : "Resume",
+                      systemImage: screen.controls.resumeOffersUpgrade ? "lock.fill" : "play.fill")
                     .font(.title3.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
@@ -278,7 +296,8 @@ struct PlayerColumn: View {
     @ScaledMetric(relativeTo: .largeTitle) private var plusHeight: CGFloat = 96
 
     var body: some View {
-        let colour = PlayerColour.color(side.colour)
+        // Free: no colours shown (ADR-0010).
+        let colour = side.showsColour ? PlayerColour.color(side.colour) : Color.secondary.opacity(0.3)
         VStack(spacing: 12) {
             VStack(spacing: 8) {
                 Capsule().fill(colour).frame(height: 8)
@@ -347,6 +366,31 @@ struct PlayerColumn: View {
         // The score is read once, as "Asher 4, Me 3", by the header; the column holds the buttons.
         .accessibilityElement(children: .contain)
         .accessibilityLabel(side.name)
+    }
+}
+
+/// Free (S14, S52): the head-to-head strip, greyed, with an upgrade prompt instead of the figures.
+struct LockedHeadToHeadStrip: View {
+    let upgrade: () -> Void
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Text("Head to head")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            Button(action: upgrade) {
+                Label("Upgrade now to see who's ahead", systemImage: "lock.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(.borderless)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background(.quaternary.opacity(0.5))
+        .foregroundStyle(.secondary)
     }
 }
 

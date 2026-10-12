@@ -1,15 +1,18 @@
 import iOSAdapters
 import LiveActivityShared
+import MatchesApplication
 
 /// Composition for the lock-screen Live Activity (spec 018): the ActivityKit adapter follows
 /// `LockScreenState` after every stored match event, and the lock-screen buttons (App Intents
-/// performed in this process) are routed to the Matches use cases.
+/// performed in this process) are routed to the Matches use cases. `RemoveLiveActivityOnLock`
+/// removes it on `AppLocked` (spec 025); `LockScreenState` is none while Free.
 ///
 /// Installed from the app's `init`, so it is in place even when iOS launches the app in the
 /// background just to perform a lock-screen button.
 @MainActor
 public enum LockScreenLiveActivity {
     private static var activity: LockScreenActivity?
+    private static var removeOnLock: RemoveLiveActivityOnLock?
 
     public static func install() {
         guard activity == nil else { return }
@@ -19,9 +22,12 @@ public enum LockScreenLiveActivity {
         let presenter = ActivityKitLockScreenPresenter()
         let activity = LockScreenActivity(state: container.liveMatches, presenter: presenter)
         activity.subscribe(to: container.dispatcher)
+        let removeOnLock = RemoveLiveActivityOnLock(liveActivity: activity)
+        removeOnLock.subscribe(to: container.dispatcher)
         presenter.observeForeground { activity.refresh() }
         activity.refresh()
         self.activity = activity
+        self.removeOnLock = removeOnLock
         #endif
     }
 }

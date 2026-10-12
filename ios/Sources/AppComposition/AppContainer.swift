@@ -83,7 +83,8 @@ final class AppContainer {
         directory = PlayersForMatches(list: players, commands: players)
         matchSettings = try MatchSettingsService(store: SQLiteMatchSettingsStore(db: db), edition: edition)
         matchSettings.subscribe(to: dispatcher)  // effective values follow AppUnlocked / AppLocked (spec 026)
-        liveMatches = LiveMatchesProjection(players: directory)
+        liveMatches = LiveMatchesProjection(players: directory, edition: edition)
+        liveMatches.subscribeToEdition(dispatcher)
         let store = try SQLiteMatchEventStore(db: db, originDevice: DeviceIdentity.id(in: db))
         // Stats (spec 013): subscribe before any command can dispatch, then catch up on everything
         // Matches published before Stats existed (or since it last ran), via Matches' open host replay.
@@ -222,7 +223,7 @@ final class AppContainer {
     /// History match detail: Edit score, Mark finished, Delete (spec 015).
     var matchDetailActions: MatchDetailActions {
         MatchDetailActions(
-            correctScore: { [matchCommands] id, edit, confirmed in
+            correctScore: { [matchCommands, showUpgradeOffer] id, edit, confirmed in
                 let score: CorrectedScore = switch edit {
                 case .frames(let p): .frames(first: p.first, second: p.second)
                 case .sets(let sets): .sets(sets.map { SetScore(first: $0.first, second: $0.second) })
@@ -232,10 +233,26 @@ final class AppContainer {
                     return []
                 } catch MatchCommandError.correctionNeedsConfirmation(let warnings) {
                     return warnings
+                } catch let refused as UpgradeRequired {
+                    // Free: only the newest ended matches can be corrected (S29) → upgrade offer (S52).
+                    showUpgradeOffer(refused.feature)
+                    return []
                 }
             },
             markFinished: { [matchCommands] in try matchCommands.markMatchFinished($0) },
-            delete: { [matchCommands] in try matchCommands.deleteMatch($0) })
+            delete: deleteMatchOrOffer)
+    }
+
+    /// The Scorer's `DeleteMatch` (S30); a Free refusal (beyond the newest ended matches) opens the
+    /// upgrade offer (S52) instead of an error.
+    var deleteMatchOrOffer: @MainActor @Sendable (UUID) throws -> Void {
+        { [matchCommands, showUpgradeOffer] id in
+            do {
+                try matchCommands.deleteMatch(id)
+            } catch let refused as UpgradeRequired {
+                showUpgradeOffer(refused.feature)
+            }
+        }
     }
 
     /// New Game's swipe to archive (ADR-0008), adapted from Players.
@@ -245,7 +262,7 @@ final class AppContainer {
 
     var statsPorts: StatsPorts {
         StatsPorts(
-            history: matchRecords, deleteMatch: { [matchCommands] in try matchCommands.deleteMatch($0) },
+            history: matchRecords, deleteMatch: deleteMatchOrOffer,
             stats: matchRecords, me: { [players] in players.me?.id },
             edition: edition, showUpgradeOffer: showUpgradeOffer)
     }

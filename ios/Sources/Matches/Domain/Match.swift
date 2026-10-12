@@ -60,6 +60,13 @@ public struct BreakerOrigin: Hashable, Sendable, Codable {
     public let frameNumber: Int
 }
 
+/// How a match was paused: by hand (`MatchPaused`) or automatically after a kill (`MatchAutoPaused`).
+/// The edition guard on `ResumeMatch` needs it: resuming an automatic pause stays free (ADR-0010).
+public enum PauseKind: String, Hashable, Sendable, Codable {
+    case byHand
+    case automatic
+}
+
 /// A pause, closed when the match resumes.
 public struct Pause: Hashable, Sendable, Codable {
     public let startedAt: Date
@@ -601,6 +608,13 @@ public struct Match: Hashable, Sendable, Identifiable {
     }
 
     public var isPaused: Bool { status == .paused }
+
+    /// Invariant: a Paused match knows how it was paused, from its open pause (`MatchPaused` → by hand,
+    /// `MatchAutoPaused` → automatic). Nil unless Paused. Derived from the events; nothing new is stored.
+    public var pauseKind: PauseKind? {
+        guard status == .paused, let open = pauses.last, open.endedAt == nil else { return nil }
+        return open.isAutomatic ? .automatic : .byHand
+    }
 
     /// Who breaks the next frame, derived from the frames and the break rule; nil before a breaker is chosen.
     /// Alternate: the origin breaks the odd frames counted from the origin.

@@ -21,6 +21,7 @@ public struct TimerReading: Hashable, Sendable {
 public struct LiveSide: Identifiable, Hashable, Sendable {
     public let id: PlayerRef
     public var name: String
+    /// Palette key; `noColour` (empty) while Free, when colours aren't shown.
     public var colour: String
     /// Total frames won in the match.
     public var frames: Int
@@ -46,6 +47,10 @@ public struct LiveSide: Identifiable, Hashable, Sendable {
         self.isBreaker = isBreaker
         self.sets = sets
     }
+
+    /// The colour of a side while Free: none shown (ADR-0010).
+    public static let noColour = ""
+    public var showsColour: Bool { colour != Self.noColour }
 
     /// The big number on the live screen: the current set's frames for sets, else total frames.
     public var scoreFrames: Int { sets?.currentSetFrames ?? frames }
@@ -153,10 +158,14 @@ public struct LiveMatchScreen: Identifiable, Hashable, Sendable {
         public var resume: Bool
         /// Correct breaker (S41): in play or paused, once a breaker has been chosen.
         public var correctBreaker: Bool
+        /// Free: pausing by hand is paid, so the pause button shows "Upgrade now" (S7, S52).
+        public var pauseOffersUpgrade: Bool
+        /// Free: a match paused by hand can't be resumed (an automatic pause can, S8, S27).
+        public var resumeOffersUpgrade: Bool
 
         public init(
             chooseBreaker: Bool, award: Bool, removeFrom: Set<PlayerRef>, pause: Bool, resume: Bool,
-            correctBreaker: Bool = false
+            correctBreaker: Bool = false, pauseOffersUpgrade: Bool = false, resumeOffersUpgrade: Bool = false
         ) {
             self.chooseBreaker = chooseBreaker
             self.award = award
@@ -164,6 +173,8 @@ public struct LiveMatchScreen: Identifiable, Hashable, Sendable {
             self.pause = pause
             self.resume = resume
             self.correctBreaker = correctBreaker
+            self.pauseOffersUpgrade = pauseOffersUpgrade
+            self.resumeOffersUpgrade = resumeOffersUpgrade
         }
     }
 
@@ -183,12 +194,18 @@ public struct LiveMatchScreen: Identifiable, Hashable, Sendable {
     /// Clears once the next frame is scored or the set win is undone.
     public var setWon: SetWonPrompt?
     /// Both sides share a colour and no breaker is chosen yet (S46): the app offers a temporary colour.
+    /// Never while Free (no colours are shown).
     public var coloursClash: Bool
+    /// Free: false, and the sides carry no colour (ADR-0010).
+    public var showsColours: Bool
+    /// Free: the head-to-head (S14) is greyed with an upgrade prompt instead of the figures.
+    public var headToHeadLocked: Bool
 
     public init(
         id: MatchID, startedAt: Date, game: Game, style: MatchStyle, breakRule: BreakRule,
         sides: [LiveSide], matchTimer: TimerReading, frameTimer: TimerReading, isPaused: Bool,
-        controls: Controls, targetReachedBy: PlayerRef?, setWon: SetWonPrompt? = nil, coloursClash: Bool = false
+        controls: Controls, targetReachedBy: PlayerRef?, setWon: SetWonPrompt? = nil, coloursClash: Bool = false,
+        showsColours: Bool = true, headToHeadLocked: Bool = false
     ) {
         self.id = id
         self.startedAt = startedAt
@@ -203,6 +220,8 @@ public struct LiveMatchScreen: Identifiable, Hashable, Sendable {
         self.targetReachedBy = targetReachedBy
         self.setWon = setWon
         self.coloursClash = coloursClash
+        self.showsColours = showsColours
+        self.headToHeadLocked = headToHeadLocked
     }
 
     /// "(1) 5 – 2 (0)" for sets, else "5 – 2".

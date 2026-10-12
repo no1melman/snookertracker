@@ -143,6 +143,18 @@ public final class SQLiteMatchEventStore: Sendable {
             .compactMap { $0.string("stream_id") }
     }
 
+    /// The `limit` newest ended streams (finished, abandoned or cancelled; deleted ones are gone from
+    /// History), newest started first, ties by stream id as History breaks them.
+    func newestEndedStreams(limit: Int) throws -> [String] {
+        guard limit > 0 else { return [] }
+        return try db.query("""
+            SELECT stream_id FROM match_streams
+            WHERE status IN ('\(MatchStatus.finished.rawValue)', '\(MatchStatus.abandoned.rawValue)', '\(MatchStatus.cancelled.rawValue)')
+            ORDER BY started_at DESC, stream_id DESC LIMIT ?
+            """, [limit]
+        ).compactMap { $0.string("stream_id") }
+    }
+
     /// Streams with that player on either side, oldest started first.
     func streams(withPlayer player: String) throws -> [String] {
         try db.query("""
@@ -186,6 +198,10 @@ public final class EventSourcedMatchRepository: MatchRepository {
 
     public func findByPlayer(_ player: PlayerRef) throws -> [Match] {
         try store.streams(withPlayer: PlayerId(player).value).compactMap(load)
+    }
+
+    public func isAmongNewestEnded(_ id: MatchID, _ n: Int) throws -> Bool {
+        try store.newestEndedStreams(limit: n).contains(MatchId(id).value)
     }
 
     private func load(_ stream: String) throws -> Match? {
