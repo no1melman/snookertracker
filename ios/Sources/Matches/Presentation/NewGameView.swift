@@ -1,6 +1,7 @@
 import DesignSystem
 import MatchesApplication
 import SwiftUI
+import UpgradePublished
 
 /// New Game: recent setups (`TemplateList`, spec 008) on top, most used first: one tap starts that
 /// match, swipe deletes the template. Below, Enter details (spec 010): two players, game, style and
@@ -171,11 +172,15 @@ public struct NewGameView: View {
 
     private func addPlayer() {
         guard let ports, !newName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        attempt($error) {
+        do {
             let colour = PlayerColour.nextUnused(ports.players.suggestions.map(\.colour)).rawValue
             let player = try ports.players.addPlayer(named: newName, colour: colour)
             newName = ""
             if selected.count < 2 { selected.append(player.id) }
+        } catch let refused as UpgradeRequired {
+            ports.showUpgradeOffer(refused.feature)  // S3: the Free player cap (S52)
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 

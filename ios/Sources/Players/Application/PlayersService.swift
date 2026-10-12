@@ -16,6 +16,8 @@ public protocol PlayerRepository: Sendable {
     func findByName(_ name: PlayerName) throws -> Player?
     /// From the colours of existing (active and archived) players.
     func nextUnusedColour() throws -> Colour
+    /// Active players only (archived, merged away and removed excluded): the Free cap (S3, S35).
+    func countActive() throws -> Int
 }
 
 /// `PlayersList` read side: a direct query, no aggregates.
@@ -51,7 +53,11 @@ public final class PlayersService: PlayersListQuery, PlayerCommands {
     /// (no limits) until the composition root hands over the device's edition.
     @ObservationIgnored public var edition: any CurrentEdition
 
-    public private(set) var players: [PlayerListItem] = []
+    /// The stored rows; `players` applies the edition at read time, so an unlock or a revocation shows
+    /// or hides colours without touching a row.
+    private var rows: [PlayerListItem] = []
+    /// Bumped on `AppUnlocked` / `AppLocked` so observers re-read `players`.
+    private var editionChanges = 0
     private var meSetting: MeSetting = .unset
 
     public init(
@@ -67,17 +73,31 @@ public final class PlayersService: PlayersListQuery, PlayerCommands {
         self.matchQueries = matchQueries
         self.edition = edition
         self.now = now
-        players = try reader.list()
+        rows = try reader.list()
         meSetting = try meStore.get()
+        dispatcher.subscribe(AppUnlockedPublished.self) { [weak self] _ in self?.editionDidChange() }
+        dispatcher.subscribe(AppLockedPublished.self) { [weak self] _ in self?.editionDidChange() }
+    }
+
+    nonisolated private func editionDidChange() {
+        Task { @MainActor in self.editionChanges += 1 }
     }
 
     // MARK: Read models
+
+    /// `PlayersList` (S22): the stored rows, colour omitted while Free. Nothing stored changes.
+    public var players: [PlayerListItem] {
+        _ = editionChanges
+        let showsColour = edition.allows(.colours)
+        return rows.map { $0.showingColour(showsColour) }
+    }
 
     public var me: PlayerListItem? {
         guard let id = meSetting.me?.value else { return nil }
         return players.first { $0.id == id }
     }
 
+    /// `PlayerSuggestions(prefix)`: active players only, colour omitted while Free.
     public func suggestions(prefix: String) -> [PlayerListItem] {
         let key = prefix.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return players.filter { !$0.isArchived && $0.name.lowercased().hasPrefix(key) }
@@ -90,14 +110,18 @@ public final class PlayersService: PlayersListQuery, PlayerCommands {
     // MARK: Commands
 
     /// `AddPlayer`. An archived player's name throws `nameHeldByArchivedPlayer`, carrying that player
-    /// so the caller can offer `RemovePlayer`.
+    /// so the caller can offer `RemovePlayer`. Free: refused with `UpgradeRequired(.extraPlayers)` when
+    /// the active players are at the `FreeLimits` cap (S3, S52), and the colour is always the next
+    /// unused one (choosing it is paid, S22).
     @discardableResult
     public func addPlayer(named name: String, colour: String) throws -> PlayerID {
         let name = try Self.name(name)
-        let colour = try Colour(rawValue: colour) ?? repository.nextUnusedColour()
+        let chosen = edition.allows(.colours) ? Colour(rawValue: colour) : nil
+        let colour = try chosen ?? repository.nextUnusedColour()
         let id = PlayerId.new()
         let player = try Self.unwrap(
             Player.add(id: id, name: name, colour: colour, sameNamed: try repository.findByName(name), at: now()), name)
+        try requireRoomForAnotherActivePlayer()
         try commit(player)
         return id.value
     }
@@ -108,7 +132,9 @@ public final class PlayersService: PlayersListQuery, PlayerCommands {
         try commit(try Self.unwrap(player.rename(to: name, sameNamed: try repository.findByName(name), at: now()), name))
     }
 
+    /// `ChangePlayerColour` (S22): paid. Free: refused with `UpgradeRequired(.colours)`.
     public func changePlayerColour(_ id: PlayerID, to colour: String) throws {
+        guard edition.allows(.colours) else { throw UpgradeRequired(.colours) }
         guard let colour = Colour(rawValue: colour) else { throw PlayerCommandError.notAllowedNow }
         let player = try load(id)
         try commit(try Self.unwrap(player.changeColour(to: colour, at: now()), player.name))
@@ -134,10 +160,13 @@ public final class PlayersService: PlayersListQuery, PlayerCommands {
         try commit(try Self.unwrap(player.archive(isInLiveMatch: live, at: now()), player.name))
     }
 
-    /// `UnarchivePlayer` (S35).
+    /// `UnarchivePlayer` (S35). Free: refused with `UpgradeRequired(.extraPlayers)` when the active
+    /// players are at the `FreeLimits` cap (S52).
     public func unarchivePlayer(_ id: PlayerID) throws {
         let player = try load(id)
-        try commit(try Self.unwrap(player.unarchive(at: now()), player.name))
+        let unarchived = try Self.unwrap(player.unarchive(at: now()), player.name)
+        try requireRoomForAnotherActivePlayer()
+        try commit(unarchived)
     }
 
     /// `RemovePlayer` (S42): archived only. Confirmation is the UI's (ADR-0008: only when
@@ -156,6 +185,15 @@ public final class PlayersService: PlayersListQuery, PlayerCommands {
 
     // MARK: Plumbing
 
+    /// The Free cap on active players (Me included, archived not counted), read from `FreeLimits`.
+    /// Only guards a new active player: players already over the cap after a revocation stay.
+    private func requireRoomForAnotherActivePlayer() throws {
+        guard let limits = edition.limits else { return }
+        guard limits.allowsAnotherActivePlayer(activeCount: try repository.countActive()) else {
+            throw UpgradeRequired(.extraPlayers)
+        }
+    }
+
     private func load(_ id: PlayerID) throws -> Player {
         guard let player = try repository.getById(PlayerId(id)) else { throw PlayerCommandError.unknownPlayer }
         return player
@@ -167,7 +205,7 @@ public final class PlayersService: PlayersListQuery, PlayerCommands {
         let me = player.domainEvents.reduce(meSetting, MePolicies.react)
         if me != meSetting { try saveMe(me) }
         dispatcher.dispatch(player.domainEvents.compactMap(PlayerEventWire.published))
-        players = try reader.list()
+        rows = try reader.list()
     }
 
     private func saveMe(_ next: MeSetting) throws {

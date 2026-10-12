@@ -79,7 +79,8 @@ public struct WelcomeView: View {
     /// The name step: creates the player (or takes the one an interrupted welcome created).
     private func next() {
         guard let ports, !isBlank else { return }
-        attempt($error) {
+        // S3/S48: a Free cap refusal opens the upgrade offer.
+        attempt($error, offer: ports.showUpgradeOffer) {
             let colour = PlayerColour.nextUnused(ports.list.players.map(\.colour)).rawValue
             player = try Welcome.player(named: name, colour: colour, list: ports.list, commands: ports.commands)
         }
