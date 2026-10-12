@@ -3,6 +3,7 @@ import Foundation
 import MatchesPublished
 import Observation
 import PlayersPublished
+import UpgradePublished
 
 /// The match-record projections (spec 013): takes in Matches' and Players' published events, keeps
 /// its own log of them, folds each match into a `MatchRecord`, and answers `PastMatches` and
@@ -21,9 +22,13 @@ public final class MatchRecordsProjection: MatchHistoryQuery {
     @ObservationIgnored public private(set) var lastError: (any Error)?
     /// Weekdays (S19, S28) are read from a match's start time in this calendar.
     @ObservationIgnored let calendar: Calendar
+    /// Upgrade's `CurrentEdition` open host (ADR-0011): read it before a guarded action. Unlocked
+    /// (no limits) until the composition root hands over the device's edition.
+    @ObservationIgnored public var edition: any CurrentEdition
 
-    public init(store: any StatsStore, calendar: Calendar = .current) throws {
+    public init(store: any StatsStore, calendar: Calendar = .current, edition: any CurrentEdition = FixedEdition.unlocked) throws {
         self.store = store
+        self.edition = edition
         self.calendar = calendar
         records = Dictionary(uniqueKeysWithValues: try store.allRecords().map { ($0.id, $0) })
         players = Dictionary(uniqueKeysWithValues: try store.allPlayers().map { ($0.id, $0) })

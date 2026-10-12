@@ -1,13 +1,23 @@
 import DesignSystem
 import PlayersApplication
+import UpgradePublished
 import SwiftUI
 
 /// The Players application ports a view may use, injected by the composition root.
 public struct PlayersPorts: Sendable {
     public let list: any PlayersListQuery
     public let commands: any PlayerCommands
+    /// Upgrade's `CurrentEdition` (ADR-0011); Unlocked when not handed over.
+    public let edition: any CurrentEdition
+    /// Routes a refused paid feature to Upgrade's `ShowUpgradeOffer` (S52); a no-op when not handed over.
+    public let showUpgradeOffer: ShowUpgradeOfferAction
 
-    public init(list: any PlayersListQuery, commands: any PlayerCommands) {
+    public init(
+        list: any PlayersListQuery, commands: any PlayerCommands,
+        edition: any CurrentEdition = FixedEdition.unlocked, showUpgradeOffer: @escaping ShowUpgradeOfferAction = { _ in }
+    ) {
+        self.edition = edition
+        self.showUpgradeOffer = showUpgradeOffer
         self.list = list
         self.commands = commands
     }

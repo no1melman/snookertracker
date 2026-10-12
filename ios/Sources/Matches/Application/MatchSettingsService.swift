@@ -1,15 +1,20 @@
 import Foundation
 import MatchesDomain
 import Observation
+import UpgradePublished
 
 /// `MatchSettingsView` + `ChangeMatchDefaults` + `SetLiveMatchLimit` (spec 007), persisted per device.
 @MainActor @Observable
 public final class MatchSettingsService: MatchSettings {
     private let store: any MatchSettingsStore
     public private(set) var values: MatchSettingsValues
+    /// Upgrade's `CurrentEdition` open host (ADR-0011): read it before a guarded action. Unlocked
+    /// (no limits) until the composition root hands over the device's edition.
+    @ObservationIgnored public var edition: any CurrentEdition
 
-    public init(store: any MatchSettingsStore) throws {
+    public init(store: any MatchSettingsStore, edition: any CurrentEdition = FixedEdition.unlocked) throws {
         self.store = store
+        self.edition = edition
         values = try store.get() ?? .initial
     }
 

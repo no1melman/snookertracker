@@ -3,14 +3,19 @@
 // Contexts talk only through their *Published modules (events + open-host query protocols).
 import PackageDescription
 
-let contexts = ["Matches", "Players", "Stats"]
+// Upgrade first: it depends on no other context (ADR-0011).
+let contexts = ["Upgrade", "Matches", "Players", "Stats"]
 
 /// Which other contexts' published modules each context may see (ADR-0002, ADR-0003).
 let publishedDeps: [String: [String]] = [
-    "Matches": ["Players", "Stats"],  // Players: customer/supplier; Stats: HeadToHead OHS
-    "Players": ["Matches"],           // IsPlayerInLiveMatch, HavePlayedEachOther OHS
-    "Stats": ["Matches", "Players"],  // published language, conformist
+    "Matches": ["Players", "Stats", "Upgrade"],  // Players: customer/supplier; Stats: HeadToHead OHS
+    "Players": ["Matches", "Upgrade"],           // IsPlayerInLiveMatch, HavePlayedEachOther OHS
+    "Stats": ["Matches", "Players", "Upgrade"],  // published language, conformist
+    // Upgrade -> Matches, Players, Stats: CurrentEdition OHS + AppUnlocked / AppLocked (ADR-0011).
 ]
+
+/// Upgrade's published module re-exposes its own domain value objects (one Free-limits table, ADR-0011).
+let publishedOwnDeps: [String: [String]] = ["Upgrade": ["UpgradeDomain"]]
 
 var targets: [Target] = [
     .target(name: "EventDispatch", path: "Sources/Shared/EventDispatch"),
@@ -23,7 +28,10 @@ var targets: [Target] = [
 for c in contexts {
     let others = publishedDeps[c, default: []].map { Target.Dependency(stringLiteral: "\($0)Published") }
     targets += [
-        .target(name: "\(c)Published", dependencies: ["EventDispatch"], path: "Sources/\(c)/Published"),
+        .target(
+            name: "\(c)Published",
+            dependencies: ["EventDispatch"] + publishedOwnDeps[c, default: []].map { Target.Dependency(stringLiteral: $0) },
+            path: "Sources/\(c)/Published"),
         .target(name: "\(c)Domain", path: "Sources/\(c)/Domain"),
         .target(
             name: "\(c)Application",
@@ -35,12 +43,12 @@ for c in contexts {
             path: "Sources/\(c)/Infrastructure"),
         .target(
             name: "\(c)Presentation",
-            dependencies: [.target(name: "\(c)Application"), "DesignSystem"],
+            dependencies: [.target(name: "\(c)Application"), .target(name: "\(c)Published"), "DesignSystem"] + others,
             path: "Sources/\(c)/Presentation"),
         .testTarget(name: "\(c)DomainTests", dependencies: [.target(name: "\(c)Domain")], path: "Tests/\(c)/DomainTests"),
         .testTarget(
             name: "\(c)IntegrationTests",
-            dependencies: [.target(name: "\(c)Domain"), .target(name: "\(c)Application"), .target(name: "\(c)Infrastructure"), .target(name: "\(c)Published"), "EventDispatch", "SQLiteSupport"],
+            dependencies: [.target(name: "\(c)Domain"), .target(name: "\(c)Application"), .target(name: "\(c)Infrastructure"), .target(name: "\(c)Published"), "EventDispatch", "SQLiteSupport"] + others,
             path: "Tests/\(c)/IntegrationTests"),
     ]
 }
@@ -69,7 +77,7 @@ targets.append(.testTarget(
 targets.append(.testTarget(
     name: "StatsContractTests",
     dependencies: ["StatsApplication", "StatsInfrastructure", "MatchesDomain", "MatchesApplication",
-                   "MatchesInfrastructure", "MatchesPublished", "PlayersPublished", "EventDispatch", "SQLiteSupport"],
+                   "MatchesInfrastructure", "MatchesPublished", "PlayersPublished", "UpgradePublished", "EventDispatch", "SQLiteSupport"],
     path: "Tests/Stats/ContractTests"))
 
 // Composition root module: wires every context; the Xcode app target is a thin @main over it.

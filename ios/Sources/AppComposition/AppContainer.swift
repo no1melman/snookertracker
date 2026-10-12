@@ -13,6 +13,10 @@ import StatsApplication
 import StatsInfrastructure
 import StatsPresentation
 import StatsPublished
+import UpgradeApplication
+import UpgradeInfrastructure
+import UpgradePresentation
+import UpgradePublished
 #if canImport(UserNotifications)
 import UserNotifications
 #endif
@@ -23,6 +27,12 @@ import UserNotifications
 final class AppContainer {
     static let shared = AppContainer()
 
+    /// Upgrade (spec 023): the device's cached edition, the `CurrentEdition` open host every other
+    /// context reads, and the purchase / restore / App Store update use cases.
+    let edition: StoredEdition
+    let upgrade: UpgradeUseCases
+    /// S52: where a refused paid feature lands; the offer UI presents `request`.
+    let upgradeOffers: UpgradeOfferRouter
     let players: PlayersService
     let matchSettings: MatchSettingsService
     let liveMatches: LiveMatchesProjection
@@ -57,27 +67,34 @@ final class AppContainer {
         }
     }
 
-    init(database db: SQLiteDatabase, lifecycle: AppLifecycle = AppLifecycle()) throws {
+    init(
+        database db: SQLiteDatabase, lifecycle: AppLifecycle = AppLifecycle(),
+        appStore: any AppStorePort = AppContainer.makeAppStore()
+    ) throws {
         self.lifecycle = lifecycle
+        // Upgrade first (ADR-0011): it depends on nothing, and every other context reads its edition.
+        edition = try StoredEdition(store: SQLiteEditionStore(db: db))
+        upgrade = UpgradeUseCases(store: edition, appStore: appStore, dispatcher: dispatcher)
+        upgradeOffers = UpgradeOfferRouter(edition: edition)
         let playerRepository = try SQLitePlayerRepository(db: db)
         players = try PlayersService(
             repository: playerRepository, reader: playerRepository, meStore: SQLiteMeSettingStore(db: db),
-            dispatcher: dispatcher)
+            dispatcher: dispatcher, edition: edition)
         directory = PlayersForMatches(list: players, commands: players)
-        matchSettings = try MatchSettingsService(store: SQLiteMatchSettingsStore(db: db))
+        matchSettings = try MatchSettingsService(store: SQLiteMatchSettingsStore(db: db), edition: edition)
         liveMatches = LiveMatchesProjection(players: directory)
         let store = try SQLiteMatchEventStore(db: db, originDevice: DeviceIdentity.id(in: db))
         // Stats (spec 013): subscribe before any command can dispatch, then catch up on everything
         // Matches published before Stats existed (or since it last ran), via Matches' open host replay.
         let statsStore = try SQLiteStatsStore(db: db)
-        matchRecords = try MatchRecordsProjection(store: statsStore)
+        matchRecords = try MatchRecordsProjection(store: statsStore, edition: edition)
         matchRecords.subscribe(to: dispatcher)
         // Series (spec 016) lives in Stats: subscribed after the records, so player names are current
         // before the series list refreshes on a merge or removal.
         let seriesRepository = try SQLiteSeriesRepository(db: db)
         seriesList = SeriesListProjection(
             reader: seriesRepository, catalog: StatsStoreSetupCatalog(records: statsStore, players: statsStore))
-        seriesCommands = SeriesUseCases(repository: seriesRepository, list: seriesList)
+        seriesCommands = SeriesUseCases(repository: seriesRepository, list: seriesList, edition: edition)
         seriesCommands.subscribe(to: dispatcher)
         try seriesCommands.loadSeries()
         monthlySummaries = MonthlySummaryProjection(
@@ -91,7 +108,7 @@ final class AppContainer {
         try matchRecords.catchUp(from: SQLiteMatchEventHistory(db: db, store: store))
         matchCommands = MatchUseCases(
             repository: EventSourcedMatchRepository(store: store), settings: matchSettings, players: directory,
-            readModel: liveMatches, dispatcher: dispatcher)
+            readModel: liveMatches, dispatcher: dispatcher, edition: edition)
         #if canImport(UserNotifications)
         warnLongFrame = WarnLongFrame(matches: liveMatches, scheduler: notifications)
         #else
@@ -103,7 +120,7 @@ final class AppContainer {
         // Templates (spec 008): CreateOrUseTemplate reacts to MatchStarted once it is stored.
         let templateRepository = try SQLiteTemplateRepository(db: db)
         templateList = TemplateListProjection(reader: templateRepository, players: directory)
-        templateCommands = TemplateUseCases(repository: templateRepository, list: templateList)
+        templateCommands = TemplateUseCases(repository: templateRepository, list: templateList, edition: edition)
         templateCommands.subscribe(to: dispatcher)
         try templateCommands.loadTemplates()
         // Spec 011: Matches reacts to PlayerRemoved / PlayersMerged / PlayerArchived, and answers
@@ -130,6 +147,8 @@ final class AppContainer {
         askForNotificationsOnFirstMatch()
         deliverSeriesSummaries()
         issueSummaries.run()
+        // Verified unlocks (Ask to Buy approvals, even after a restart) and revocations (S49, S51).
+        Task { [upgrade] in await upgrade.listenForTransactionUpdates() }
         #if DEBUG
         seedDemoIfRequested()
         #endif
@@ -162,22 +181,40 @@ final class AppContainer {
         #endif
     }
 
+    /// The App Store seam (ADR-0011's anti-corruption layer). Spec 028 replaces the fake with the
+    /// StoreKit 2 adapter here; nothing else in the app knows which one runs.
+    nonisolated static func makeAppStore() -> any AppStorePort {
+        FakeAppStore(purchaseOutcome: .purchased)
+    }
+
     /// Application Support/SnookerTracker/SnookerTracker.sqlite
     static var databaseURL: URL {
         URL.applicationSupportDirectory.appending(path: "SnookerTracker", directoryHint: .isDirectory)
             .appending(path: "SnookerTracker.sqlite")
     }
 
-    var playersPorts: PlayersPorts { PlayersPorts(list: players, commands: players) }
+    /// S52: a refused paid feature routes here.
+    var showUpgradeOffer: ShowUpgradeOfferAction {
+        { [upgradeOffers] feature in upgradeOffers.show(feature) }
+    }
+
+    var upgradePorts: UpgradePorts { UpgradePorts(edition: edition, commands: upgrade) }
+
+    var playersPorts: PlayersPorts {
+        PlayersPorts(list: players, commands: players, edition: edition, showUpgradeOffer: showUpgradeOffer)
+    }
 
     var matchesPorts: MatchesPorts {
         MatchesPorts(live: liveMatches, screens: liveMatches, commands: matchCommands, settings: matchSettings,
                      players: directory, templates: templateList, templateCommands: templateCommands,
-                     headToHead: LiveHeadToHead.lookup(matchRecords))
+                     headToHead: LiveHeadToHead.lookup(matchRecords),
+                     edition: edition, showUpgradeOffer: showUpgradeOffer)
     }
 
     var seriesPorts: SeriesPorts {
-        SeriesPorts(list: seriesList, commands: seriesCommands, summaries: monthlySummaries)
+        SeriesPorts(
+            list: seriesList, commands: seriesCommands, summaries: monthlySummaries,
+            edition: edition, showUpgradeOffer: showUpgradeOffer)
     }
 
     /// History match detail: Edit score, Mark finished, Delete (spec 015).
@@ -207,7 +244,8 @@ final class AppContainer {
     var statsPorts: StatsPorts {
         StatsPorts(
             history: matchRecords, deleteMatch: { [matchCommands] in try matchCommands.deleteMatch($0) },
-            stats: matchRecords, me: { [players] in players.me?.id })
+            stats: matchRecords, me: { [players] in players.me?.id },
+            edition: edition, showUpgradeOffer: showUpgradeOffer)
     }
 }
 

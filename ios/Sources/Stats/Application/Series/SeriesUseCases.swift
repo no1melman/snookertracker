@@ -3,6 +3,7 @@ import Foundation
 import Observation
 import PlayersPublished
 import StatsDomain
+import UpgradePublished
 
 /// `SeriesList` read model (spec 016). Holds the stored rows (reloaded after every series change)
 /// and resolves names and colours from the catalog at read time. A setup whose player the catalog no
@@ -58,11 +59,16 @@ public final class SeriesUseCases: SeriesCommands {
     private let newID: @Sendable () -> UUID
     /// The last policy failure (a policy never throws into a Players command).
     public private(set) var lastError: (any Error)?
+    /// Upgrade's `CurrentEdition` open host (ADR-0011): read it before a guarded action. Unlocked
+    /// (no limits) until the composition root hands over the device's edition.
+    public var edition: any CurrentEdition
 
     public init(
         repository: any SeriesRepository, list: SeriesListProjection,
+        edition: any CurrentEdition = FixedEdition.unlocked,
         newID: @escaping @Sendable () -> UUID = UUID.init
     ) {
+        self.edition = edition
         self.repository = repository
         self.list = list
         self.newID = newID

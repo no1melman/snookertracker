@@ -1,5 +1,6 @@
 import DesignSystem
 import StatsApplication
+import UpgradePublished
 import SwiftUI
 
 /// The Series application ports the Series screen uses, injected by the composition root.
@@ -8,8 +9,17 @@ public struct SeriesPorts: Sendable {
     public let commands: any SeriesCommands
     /// `MonthlySummary(series, month)` (spec 017); nil hides the summary button on each row.
     public let summaries: (any MonthlySummaryQuery)?
+    /// Upgrade's `CurrentEdition` (ADR-0011); Unlocked when not handed over.
+    public let edition: any CurrentEdition
+    /// Routes a refused paid feature to Upgrade's `ShowUpgradeOffer` (S52); a no-op when not handed over.
+    public let showUpgradeOffer: ShowUpgradeOfferAction
 
-    public init(list: any SeriesListQuery, commands: any SeriesCommands, summaries: (any MonthlySummaryQuery)? = nil) {
+    public init(
+        list: any SeriesListQuery, commands: any SeriesCommands, summaries: (any MonthlySummaryQuery)? = nil,
+        edition: any CurrentEdition = FixedEdition.unlocked, showUpgradeOffer: @escaping ShowUpgradeOfferAction = { _ in }
+    ) {
+        self.edition = edition
+        self.showUpgradeOffer = showUpgradeOffer
         self.list = list
         self.commands = commands
         self.summaries = summaries

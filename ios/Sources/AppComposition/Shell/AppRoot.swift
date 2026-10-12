@@ -4,6 +4,7 @@ import MatchesPresentation
 import PlayersPresentation
 import StatsPresentation
 import SwiftUI
+import UpgradePresentation
 
 /// The app's root view: wires the ports into the environment and shows Welcome until Me exists.
 public struct AppRoot: View {
@@ -27,6 +28,7 @@ public struct AppRoot: View {
             .environment(\.playersPorts, container.playersPorts)
             .environment(\.statsPorts, container.statsPorts)
             .environment(\.seriesPorts, container.seriesPorts)
+            .environment(\.upgradePorts, container.upgradePorts)
             .environment(\.matchDetailActions, container.matchDetailActions)
             .environment(\.archivePlayer, container.archivePlayer)
             .recordsAppLifecycle(container.lifecycle)

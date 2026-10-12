@@ -3,6 +3,7 @@ import Foundation
 import MatchesDomain
 import MatchesPublished
 import Observation
+import UpgradePublished
 
 /// `TemplateList` read model (spec 008). Holds the stored rows (reloaded after every template
 /// change) and resolves names and colours from the Players supplier at read time, so a rename or
@@ -62,11 +63,16 @@ public final class TemplateUseCases: TemplateCommands {
     private let repository: any TemplateRepository
     private let list: TemplateListProjection
     private let newID: @Sendable () -> UUID
+    /// Upgrade's `CurrentEdition` open host (ADR-0011): read it before a guarded action. Unlocked
+    /// (no limits) until the composition root hands over the device's edition.
+    public var edition: any CurrentEdition
 
     public init(
         repository: any TemplateRepository, list: TemplateListProjection,
+        edition: any CurrentEdition = FixedEdition.unlocked,
         newID: @escaping @Sendable () -> UUID = UUID.init
     ) {
+        self.edition = edition
         self.repository = repository
         self.list = list
         self.newID = newID

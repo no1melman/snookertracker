@@ -1,4 +1,5 @@
 import StatsApplication
+import UpgradePublished
 import SwiftUI
 
 /// The Stats application ports a view may use, injected by the composition root.
@@ -10,11 +11,18 @@ public struct StatsPorts: Sendable {
     public let stats: (any StatsQuery)?
     /// Players' `WhoAmI`: the default point of view; nil (or returning nil) asks for a player.
     public let me: (@MainActor @Sendable () -> UUID?)?
+    /// Upgrade's `CurrentEdition` (ADR-0011); Unlocked when not handed over.
+    public let edition: any CurrentEdition
+    /// Routes a refused paid feature to Upgrade's `ShowUpgradeOffer` (S52); a no-op when not handed over.
+    public let showUpgradeOffer: ShowUpgradeOfferAction
 
     public init(
         history: any MatchHistoryQuery, deleteMatch: (@MainActor @Sendable (UUID) throws -> Void)? = nil,
-        stats: (any StatsQuery)? = nil, me: (@MainActor @Sendable () -> UUID?)? = nil
+        stats: (any StatsQuery)? = nil, me: (@MainActor @Sendable () -> UUID?)? = nil,
+        edition: any CurrentEdition = FixedEdition.unlocked, showUpgradeOffer: @escaping ShowUpgradeOfferAction = { _ in }
     ) {
+        self.edition = edition
+        self.showUpgradeOffer = showUpgradeOffer
         self.history = history
         self.deleteMatch = deleteMatch
         self.stats = stats

@@ -1,4 +1,5 @@
 import MatchesApplication
+import UpgradePublished
 import SwiftUI
 
 /// The Matches application ports a view may use, injected by the composition root.
@@ -13,13 +14,20 @@ public struct MatchesPorts: Sendable {
     public let templateCommands: (any TemplateCommands)?
     /// Stats' `HeadToHead` (S14) for the live screen's strip; nil hides the strip.
     public let headToHead: HeadToHeadLookup?
+    /// Upgrade's `CurrentEdition` (ADR-0011); Unlocked when not handed over.
+    public let edition: any CurrentEdition
+    /// Routes a refused paid feature to Upgrade's `ShowUpgradeOffer` (S52); a no-op when not handed over.
+    public let showUpgradeOffer: ShowUpgradeOfferAction
 
     public init(
         live: any LiveMatchesQuery, screens: any LiveMatchScreenQuery, commands: any MatchCommands,
         settings: any MatchSettings, players: any MatchPlayerDirectory,
         templates: (any TemplateListQuery)? = nil, templateCommands: (any TemplateCommands)? = nil,
-        headToHead: HeadToHeadLookup? = nil
+        headToHead: HeadToHeadLookup? = nil,
+        edition: any CurrentEdition = FixedEdition.unlocked, showUpgradeOffer: @escaping ShowUpgradeOfferAction = { _ in }
     ) {
+        self.edition = edition
+        self.showUpgradeOffer = showUpgradeOffer
         self.live = live
         self.screens = screens
         self.commands = commands

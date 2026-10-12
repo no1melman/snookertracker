@@ -2,6 +2,7 @@ import EventDispatch
 import Foundation
 import MatchesDomain
 import MatchesPublished
+import UpgradePublished
 
 /// The live-play and maintenance use cases (specs 010, 015) behind `MatchCommands`. Each one is
 /// load → domain behaviour → save → dispatch Stage 2 events → update the read model.
@@ -14,10 +15,14 @@ public final class MatchUseCases: MatchCommands {
     private let dispatcher: EventDispatcher
     private let now: @Sendable () -> Date
     private let newID: @Sendable () -> UUID
+    /// Upgrade's `CurrentEdition` open host (ADR-0011): read it before a guarded action. Unlocked
+    /// (no limits) until the composition root hands over the device's edition.
+    public var edition: any CurrentEdition
 
     public init(
         repository: any MatchRepository, settings: MatchSettingsService, players: any MatchPlayerDirectory,
         readModel: LiveMatchesProjection, dispatcher: EventDispatcher,
+        edition: any CurrentEdition = FixedEdition.unlocked,
         now: @escaping @Sendable () -> Date = Date.init, newID: @escaping @Sendable () -> UUID = UUID.init
     ) {
         self.repository = repository
@@ -25,6 +30,7 @@ public final class MatchUseCases: MatchCommands {
         self.players = players
         self.readModel = readModel
         self.dispatcher = dispatcher
+        self.edition = edition
         self.now = now
         self.newID = newID
     }

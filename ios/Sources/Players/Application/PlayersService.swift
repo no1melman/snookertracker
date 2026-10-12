@@ -4,6 +4,7 @@ import MatchesPublished
 import Observation
 import PlayersDomain
 import PlayersPublished
+import UpgradePublished
 
 // MARK: - Persistence ports (spec 011, 012)
 
@@ -46,6 +47,9 @@ public final class PlayersService: PlayersListQuery, PlayerCommands {
     private let now: @Sendable () -> Date
     /// Matches' `IsPlayerInLiveMatch`, `HavePlayedEachOther` and match count (ADR-0002, ADR-0008).
     @ObservationIgnored public var matchQueries: (any PlayerMatchQueries)?
+    /// Upgrade's `CurrentEdition` open host (ADR-0011): read it before a guarded action. Unlocked
+    /// (no limits) until the composition root hands over the device's edition.
+    @ObservationIgnored public var edition: any CurrentEdition
 
     public private(set) var players: [PlayerListItem] = []
     private var meSetting: MeSetting = .unset
@@ -53,6 +57,7 @@ public final class PlayersService: PlayersListQuery, PlayerCommands {
     public init(
         repository: any PlayerRepository, reader: any PlayersListReader, meStore: any MeSettingStore,
         dispatcher: EventDispatcher, matchQueries: (any PlayerMatchQueries)? = nil,
+        edition: any CurrentEdition = FixedEdition.unlocked,
         now: @escaping @Sendable () -> Date = Date.init
     ) throws {
         self.repository = repository
@@ -60,6 +65,7 @@ public final class PlayersService: PlayersListQuery, PlayerCommands {
         self.meStore = meStore
         self.dispatcher = dispatcher
         self.matchQueries = matchQueries
+        self.edition = edition
         self.now = now
         players = try reader.list()
         meSetting = try meStore.get()
