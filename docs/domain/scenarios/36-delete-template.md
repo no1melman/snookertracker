@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: paid)
 **Actor:** Scorer
 **Trigger / interface:** Template list: swipe left → delete
 **Description:** Removes the template from the list. Playing the same setup again recreates it (12), with its use count restarting.
@@ -15,6 +15,7 @@
 - Template
 
 ## Rules
+- **Edition (ADR-0010):** Paid. While the edition is Free, this opens the upgrade offer (→ 52)
 - none
 
 ## Flow

@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: paid)
 **Actor:** Scorer
 **Trigger / interface:** Main menu → New Match → template list (most used first) → tap a template
 **Description:** A template is a setup played before (players, game, match style, break rule). Picking one sets up a new match ready to start; normally it is started as is. Any part can be changed with its edit icon before starting, which is rare. From there it behaves exactly like scenario 2.
@@ -17,6 +17,7 @@
 - A template; optional edits to players, game, match style or break rule
 
 ## Rules
+- **Edition (ADR-0010):** Paid. While the edition is Free, this opens the upgrade offer (→ 52). The templates area on the start screen shows an "Upgrade now" prompt in place
 - Same as scenario 2: two different players, valid targets ("best of" odd only), live-match limit (44) not reached
 - If a player is already in a live match: "are you sure?" confirmation
 - Templates involving an archived player are not listed

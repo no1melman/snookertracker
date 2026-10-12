@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: Free edition limited to most frames wins, alternate breaks)
 **Actor:** Scorer
 **Trigger / interface:** Main menu → New Match when no templates exist (template list skipped), or the **New** button in the template list's header row
 **Description:** The scorer enters two players, the game, the match style and the break rule, and starts a fresh match. On a brand-new install, or once every template is deleted or hidden, New Match comes straight here (absorbs scenario 13).
@@ -23,6 +23,7 @@
 - Break rule: alternate (default) or winner breaks
 
 ## Rules
+- **Edition (ADR-0010):** Free: most frames wins and alternate breaks only; choosing another style or break rule opens the upgrade offer (→ 52). Players added here count towards the 5-player cap (→ 3)
 - The two players are different (nobody plays themselves)
 - Names are not blank; names are unique, case-insensitive
 - Targets are ≥ 1; "best of N" must be odd and is stored as race to ⌈N/2⌉; shown as entered; same setup either way

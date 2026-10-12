@@ -3,7 +3,7 @@
 **Type:** AUTO
 **Status:** new [?]
 **Source:** none
-**History:** ADR-0001 (baseline) · ADR-0004 (changed: the oldest live match, handing over to the next-oldest)
+**History:** ADR-0001 (baseline) · ADR-0004 (changed: the oldest live match, handing over to the next-oldest) · ADR-0010 (changed: paid)
 **Actor:** policy (reaction to match events)
 **Trigger / interface:** iOS Live Activity
 **Description:** The oldest live match shows on the lock screen with score, breaker dot and frame timer, and buttons: + for each player and pause/resume. Matches started later don't appear until it ends; then the next-oldest takes over. Anything needing a decision (first breaker, Finish/Continue prompts, −) opens the app.
@@ -16,6 +16,7 @@
 - none
 
 ## Rules
+- **Edition (ADR-0010):** Paid. No Live Activity while Free; it is removed when the purchase is revoked (51)
 - Exactly one Live Activity: the oldest live match (earliest start; ties by creation order, as the live list)
 - Later matches don't appear while it is live
 - Its buttons act on that match only; lock-screen + is the same command as scenario 5

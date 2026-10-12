@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: Free edition allows one live match)
 **Actor:** Scorer
 **Trigger / interface:** Main menu → New Match while at least one match is live
 **Description:** The app asks: end the live match (finish, abandon or cancel) or track another. Tracking another means several matches are live at once, all timers running.
@@ -16,6 +16,7 @@
 - The choice: end or track another
 
 ## Rules
+- **Edition (ADR-0010):** Free: one live match at a time. Starting another opens the upgrade offer (→ 52) alongside finishing or returning to the live one
 - Up to the live-match limit (default 10, max 100)
 - A player already in a live match can be in another after "are you sure?"
 

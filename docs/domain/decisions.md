@@ -16,6 +16,8 @@ Considered during discovery and explicitly excluded for now.
 | Shot clocks | Later | ADR-0001 |
 | Leagues (submit a match to a league) | Later, as a separate linked app; series stay small | ADR-0001 |
 | Configurable long-frame thresholds | Fixed at 30 min, then every 10 min | ADR-0001 |
+| A subscription or several in-app purchases | One-off unlock only | ADR-0010 |
+| Deleting matches beyond the Free 10 | They are hidden instead, so unlocking reveals full history | ADR-0010 |
 
 ## Retired scenarios
 Existed in the model or in code; not carried forward. Number retained, never reused.

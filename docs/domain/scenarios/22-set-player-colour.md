@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: paid)
 **Actor:** Scorer
 **Trigger / interface:** Settings → Players → a player → colour
 **Description:** The colour helps the scorer spot who to tap when coming back to the phone. Colours may repeat.
@@ -15,6 +15,7 @@
 - Player, colour
 
 ## Rules
+- **Edition (ADR-0010):** Paid. While the edition is Free, this opens the upgrade offer (→ 52). Colours are kept but not shown while Free
 - No uniqueness rule on colours
 
 ## Flow

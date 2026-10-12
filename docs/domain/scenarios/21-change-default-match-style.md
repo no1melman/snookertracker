@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: paid)
 **Actor:** Scorer
 **Trigger / interface:** Settings → default match style; default break rule
 **Description:** Sets the style (with its targets) and the break rule preselected when entering match details. Only affects matches started afterwards.
@@ -15,6 +15,7 @@
 - Match style and targets; break rule
 
 ## Rules
+- **Edition (ADR-0010):** Paid. While the edition is Free, this opens the upgrade offer (→ 52). While Free the defaults stay most frames wins and alternate breaks
 - Most frames wins and alternate breaks out of the box
 - Same target rules as scenario 2
 

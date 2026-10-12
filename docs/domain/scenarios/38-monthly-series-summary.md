@@ -3,7 +3,7 @@
 **Type:** AUTO
 **Status:** new [?]
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: paid)
 **Actor:** Clock
 **Trigger / interface:** 1st of each month, covering the previous month
 **Description:** For each series with at least one match last month, a notification ("Fridays with Asher, September: you 3–1 in matches, 22–17 in frames") opens a summary screen with the stats figures for that series and month, and the change since the previous month.
@@ -15,6 +15,7 @@
 - none
 
 ## Rules
+- **Edition (ADR-0010):** Paid. No summary is issued while Free
 - Only series with matches in the month
 - "You" only when Me is set and in the series; otherwise each pairing's results are listed
 - Series are small groups between friends; leagues are out of scope

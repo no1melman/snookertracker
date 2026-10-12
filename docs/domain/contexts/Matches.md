@@ -1,7 +1,7 @@
 # Bounded Context Canvas — Matches
 
 **Classification:** Core
-**Strategic revision:** ADR-0001 · boundaries: ADR-0002, ADR-0003
+**Strategic revision:** ADR-0001 · boundaries: ADR-0002, ADR-0003 · ADR-0011
 
 ## Purpose
 Fast, accurate scoring at the table: start a match from a setup, track frames and the break, time it, and end it as finished, abandoned or cancelled, with every action kept as the match's history. Owns templates, because a template is just a setup that isn't a live match yet.
@@ -15,6 +15,7 @@ Fast, accurate scoring at the table: start a match from a setup, track frames an
 
 | Source | Type | Description |
 |--------|------|-------------|
+| Upgrade | Query / Event | Current edition and Free limits; `AppUnlocked`, `AppLocked` (conformist, ADR-0011) |
 | Scorer | Command | StartMatch, ChooseBreaker, CorrectBreaker, AwardFrame, RemoveFrame, PauseMatch, ResumeMatch, FinishMatch, AbandonMatch, CancelMatch, FinishAllMatches, CorrectMatchScore, MarkMatchFinished, DeleteMatch, OverrideMatchColour, DeleteTemplate, ChangeDefaults, SetLiveMatchLimit |
 | Players | Query | Player names and colours (suggestions, display, colour clash check) |
 | Players | Event | `PlayersMerged` → move matches and templates to the kept player, combine identical templates; `PlayerRemoved` → delete their matches and templates |
@@ -91,6 +92,7 @@ Fast, accurate scoring at the table: start a match from a setup, track frames an
 ---
 
 ## Business Rules
+- **Free edition (ADR-0010, ADR-0011):** one live match, most frames wins and alternate breaks only, no templates (still recorded silently), no pause by hand (auto-pause and its resume stay free), no lock screen; matches already live on revocation run to the end. Refused actions open the upgrade offer (Upgrade).
 - Two different players; nobody plays themselves.
 - Nothing but choosing the breaker until the first breaker is chosen.
 - The breaker is derived, never stored per frame; sets don't affect it.
@@ -115,6 +117,7 @@ Fast, accurate scoring at the table: start a match from a setup, track frames an
 
 | External Context | Relationship | Translation Needed? |
 |-----------------|--------------|---------------------|
+| Upgrade | Conformist to its open host + published language | No |
 | Players | Customer (Players supplies; Matches uses names, colours and player events) | No: player IDs only |
 | Stats | Customer of the head-to-head and average-time queries | No |
 | iOS (Notifications, Live Activities, app lifecycle) | Anti-corruption layer | Yes: adapters at the edge |

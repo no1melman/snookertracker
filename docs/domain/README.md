@@ -1,10 +1,10 @@
 # Snooker Tracker — Domain
 
 **Language:** Swift
-**Model revision:** ADR-0005 (2026-10-05) — history in `docs/adr/`, fallout in [decisions.md](./decisions.md)
+**Model revision:** ADR-0010 (2026-10-12) — history in `docs/adr/`, fallout in [decisions.md](./decisions.md)
 
 ## Context
-An iOS app for tracking pool and snooker matches between friends, scored live on one phone by whoever is holding it. Pool is the default game and *most frames wins* the default match style; both defaults can be changed in settings. A match can also be a *race to* N frames or *sets* (race to S sets, each race to F frames), entered as "race to" or "best of" (odd numbers only). The scorer starts a match from a template (a setup played before) or by entering the details, taps who breaks, then taps + or − under each player as frames are won or corrected; the break moves automatically. Matches can be paused, left and returned to, and finished, abandoned or cancelled. Every match is kept as a history (frames, frame times, breakers, later corrections), stored on the device for now and uploadable in full when a web side arrives. Stats can be filtered by opponent and day of the week (e.g. "Asher on Fridays"), and regular match-ups can be grouped into series with a monthly summary.
+An iOS app for tracking pool and snooker matches between friends, scored live on one phone by whoever is holding it. Pool is the default game and *most frames wins* the default match style; both defaults can be changed in settings. A match can also be a *race to* N frames or *sets* (race to S sets, each race to F frames), entered as "race to" or "best of" (odd numbers only). The scorer starts a match from a template (a setup played before) or by entering the details, taps who breaks, then taps + or − under each player as frames are won or corrected; the break moves automatically. Matches can be paused, left and returned to, and finished, abandoned or cancelled. Every match is kept as a history (frames, frame times, breakers, later corrections), stored on the device for now and uploadable in full when a web side arrives. Stats can be filtered by opponent and day of the week (e.g. "Asher on Fridays"), and regular match-ups can be grouped into series with a monthly summary. The app is free on the App Store for tracking a live match (most frames wins, alternate breaks, up to 5 players, the newest 10 matches); a one-off in-app purchase (about £2.99) unlocks everything else for good (ADR-0010).
 
 ## The picture
 - [System map](./system-map.md) — actors, aggregates, external systems, and the commands/events between them, by scenario
@@ -63,8 +63,13 @@ Status: new = not built · existing = code does this today · changing = code di
 | 46 | [Offer a temporary colour](./scenarios/46-offer-temporary-colour.md) | AUTO | new | policy (reaction) | `MatchColourOverridden` |
 | 47 [?] | [Live match on the lock screen](./scenarios/47-lock-screen-live-match.md) | AUTO | new | policy (reaction) | raises nothing |
 | 48 | [First-launch welcome](./scenarios/48-first-launch-welcome.md) | YOU | new | Scorer | `PlayerAdded` |
+| 49 | [Unlock full version](./scenarios/49-unlock-full-version.md) | YOU | new | Scorer | `AppUnlocked` |
+| 50 | [Restore purchase](./scenarios/50-restore-purchase.md) | YOU | new | Scorer | `AppUnlocked` |
+| 51 | [Purchase revoked](./scenarios/51-purchase-revoked.md) | AUTO | new | App Store | `AppLocked` |
+| 52 | [Show the upgrade offer](./scenarios/52-show-upgrade-offer.md) | AUTO | new | policy (paid feature touched) | raises nothing |
+| 53 | [See what upgrading unlocks](./scenarios/53-see-upgrade-benefits.md) | YOU | new | Scorer | raises nothing |
 
-Counts: new 45 · existing 0 · changing 0 · retired 0 · merged 1 · out of scope (later) 2 — numbers 13, 23, 24 are in [decisions.md](./decisions.md)
+Counts: new 50 · existing 0 · changing 0 · retired 0 · merged 1 · out of scope (later) 2 — numbers 13, 23, 24 are in [decisions.md](./decisions.md)
 
 ## Domain Vocabulary
 See [glossary.md](./glossary.md).

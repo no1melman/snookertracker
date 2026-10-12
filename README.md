@@ -13,6 +13,7 @@ An app (iOS first; Android and remote play to follow) for tracking pool and snoo
 - **Core:** Matches — fast, accurate scoring at the table is what the app is for
 - **Core:** Stats — deciders, "Asher on Fridays" and series summaries are what make it more than a score counter
 - **Supporting:** Players — names, colours, archive, merge, Me; needed, not special
+- **Generic:** Upgrade — Free or Unlocked, the one-off in-app purchase and the Free limits; a thin wrapper over StoreKit
 - **Generic (later):** Sync / record keeping — upload everything; a cross-cutting infrastructure concern
 
 ### Bounded Context Map
@@ -22,7 +23,9 @@ flowchart LR
   Players["Players (Supporting)"]
   Matches["Matches (Core)"]
   Stats["Stats (Core)"]
+  Upgrade["Upgrade (Generic)"]
   iOS[("iOS")]
+  AppStore[("App Store")]
 
   Players -->|"Customer/Supplier"| Matches
   Matches -->|"Open host: 2 queries"| Players
@@ -31,9 +34,13 @@ flowchart LR
   Stats -->|"Open host: head-to-head, averages"| Matches
   Matches -->|"ACL"| iOS
   Stats -->|"ACL"| iOS
+  AppStore -->|"ACL"| Upgrade
+  Upgrade -->|"Open host: edition, Free limits"| Matches
+  Upgrade -->|"Open host"| Players
+  Upgrade -->|"Open host"| Stats
 ```
 
-Details: [docs/domain/context-map.md](./docs/domain/context-map.md). Canvases: [Matches](./docs/domain/contexts/Matches.md) · [Players](./docs/domain/contexts/Players.md) · [Stats](./docs/domain/contexts/Stats.md).
+Details: [docs/domain/context-map.md](./docs/domain/context-map.md). Canvases: [Matches](./docs/domain/contexts/Matches.md) · [Players](./docs/domain/contexts/Players.md) · [Stats](./docs/domain/contexts/Stats.md) · [Upgrade](./docs/domain/contexts/Upgrade.md).
 
 ### Ubiquitous Language
 
@@ -56,6 +63,9 @@ From `docs/domain/glossary.md`, split by context (full tables in each canvas):
 | Decider / Match decider / Set decider | Stats | A frame won from level / that frame as the match's last / a deciding set at sets level |
 | Head-to-head | Stats | All-time finished matches between two players: Matches, Frames, Deciders |
 | Series | Stats | A named group of setups with a monthly summary |
+| Edition | Upgrade | This device: Free or Unlocked, from one in-app purchase |
+| Free limits | Upgrade | What Free allows: 1 live match, 5 active players, newest 10 matches, most frames wins, alternate breaks |
+| Upgrade offer | Upgrade | "Upgrade now" in place, or the generic "Upgrade once, forever, to unlock" screen |
 
 ## Key Process Flows
 
@@ -78,6 +88,10 @@ From `docs/domain/glossary.md`, split by context (full tables in each canvas):
 | Auto-pause at the later of background time and last action | [ADR-0005](./docs/adr/0005-auto-pause-at-later-of-background-and-last-action.md) |
 | A match is event-sourced | [ADR-0006](./docs/adr/0006-a-match-is-event-sourced.md) |
 | No auto-pause when iOS wakes the app for a lock-screen button | [ADR-0007](./docs/adr/0007-no-auto-pause-when-ios-wakes-the-app-for-a-lock-screen-button.md) |
+| Swipe to archive and remove players | [ADR-0008](./docs/adr/0008-swipe-to-archive-and-remove-players.md) |
+| A merge moves matches with `MatchPlayerMoved` | [ADR-0009](./docs/adr/0009-a-merge-moves-matches-with-match-player-moved.md) |
+| Free and Unlocked editions, one-off in-app purchase | [ADR-0010](./docs/adr/0010-free-and-unlocked-editions.md) |
+| Upgrade context owns the edition and Free limits; each context enforces them | [ADR-0011](./docs/adr/0011-upgrade-context-owns-free-limits.md) |
 
 ## Requirements
 

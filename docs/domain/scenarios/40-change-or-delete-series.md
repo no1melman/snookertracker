@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: paid)
 **Actor:** Scorer
 **Trigger / interface:** Series screen → a series → rename, add/remove setups, delete
 **Description:** Changes which setups a series covers, or deletes it. Matches are unaffected.
@@ -16,6 +16,7 @@
 - Name and/or setups; or delete confirmation
 
 ## Rules
+- **Edition (ADR-0010):** Paid. While the edition is Free, this opens the upgrade offer (→ 52)
 - Deleting a series never deletes matches
 
 ## Flow

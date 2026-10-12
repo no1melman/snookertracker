@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: Free edition limited to visible matches)
 **Actor:** Scorer
 **Trigger / interface:** Past matches: swipe a row to reveal delete → confirmation dialog
 **Description:** Removes the match permanently from history and stats. Different from cancelling, which keeps it.
@@ -15,6 +15,7 @@
 - Confirmation
 
 ## Rules
+- **Edition (ADR-0010):** Free: only the newest 10 ended matches (the visible ones) can be deleted
 - Only ended matches (finished, abandoned, cancelled)
 
 ## Flow

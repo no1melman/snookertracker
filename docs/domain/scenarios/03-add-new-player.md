@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: 5-player cap while Free)
 **Actor:** Scorer
 **Trigger / interface:** Match details screen: type a name that matches nobody and choose "use as new name"
 **Description:** A new player is created with the typed name and the next unused colour from the palette. The player is created when the match starts, not while typing.
@@ -16,6 +16,7 @@
 - A name
 
 ## Rules
+- **Edition (ADR-0010):** Free: at most 5 active players, Me included (archived players don't count). Adding a 6th opens the upgrade offer (→ 52); existing players over the cap after a revocation (51) stay
 - Name not blank; unique, case-insensitive ("callum" = "Callum")
 - The name of an archived player is blocked, with an offer to remove that player completely (→ 42)
 - Colour: next unused palette colour; when the palette is exhausted, colours repeat from the start

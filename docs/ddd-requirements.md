@@ -1,28 +1,47 @@
-# DDD Requirements — Snooker Tracker (Matches · Players · Stats)
+# DDD Requirements — Snooker Tracker (Matches · Players · Stats · Upgrade)
 
-> The architectural constitution for Snooker Tracker's three bounded contexts, derived from `docs/domain/` at model revision ADR-0001 and the strategic design (ADR-0002, ADR-0003).
+> The architectural constitution for Snooker Tracker's four bounded contexts, derived from `docs/domain/` at model revision ADR-0010 and the strategic design (ADR-0002, ADR-0003, ADR-0011).
 > Every item below must exist in the implementation. Feed the items into your spec or planning tool as acceptance criteria; do not alter the constraints or invariants there.
 > Each item carries: the scenarios it comes from · an **Action** (build · preserve · migrate) · the **Implementation skill** to invoke.
 > Greenfield: every scenario is `new`, so every item is **build**.
 
 **Language:** Swift
-**Model revision:** ADR-0005 (2026-10-05)
-**Strategic revision:** ADR-0001 (boundaries ADR-0002, ADR-0003)
-**Previous requirements revision:** ADR-0001
+**Model revision:** ADR-0010 (2026-10-12)
+**Strategic revision:** ADR-0010 (boundaries ADR-0002, ADR-0003, ADR-0011)
+**Previous requirements revision:** ADR-0005
 
 ## Changes since last revision
 
-Caused by ADR-0004 and ADR-0005 (2026-10-05). Hand this section to the planner. The previous revision (ADR-0001 baseline) added every item, action **build**.
+Caused by ADR-0010 (Free and Unlocked editions) and ADR-0011 (Upgrade context owns the edition and Free limits), 2026-10-12. Hand this section to the planner. The previous revision covered ADR-0004 and ADR-0005. ADR-0006 to ADR-0009 were delivered through specs; only the stale Q6 row is tidied here.
+
+**Free limits** (the acceptance figures for every guard below): 1 live match · most frames wins only · alternate breaks only · 5 active players (Me included, archived not counted) · newest 10 ended matches shown · no colours, templates, pause by hand, head-to-head, stats, series or lock screen. Auto-pause after a kill and resuming from it stay free. A refused action opens the upgrade offer (S52). Nothing is ever deleted or rewritten to enforce a limit.
 
 | Change | Item | Scenarios | Action | Notes |
 |--------|------|-----------|--------|-------|
-| CHANGED | `Match` › Aggregate › `autoPause(at:)` | S27 | build | `at` is a supplied pause time, possibly earlier than now but never before the last action; `MatchAutoPaused` is stamped with it (ADR-0004, ADR-0005) |
-| CHANGED | `Match` › Use Cases › `AutoPauseLiveMatches` | S27 | build | trigger: launch after a kill (was: termination); pause at the later of the last background time and the match's last action; before `FlagStaleMatches` (ADR-0004, ADR-0005) |
-| CHANGED | `Match` › Read Requirements › `LockScreenState` | S47 | build | the oldest live match, handed to the next-oldest when it ends (was: most recently touched) |
-| CHANGED | `Match` › Repository Port › `findLive` | S47 | build | also selects the lock-screen match; ties by creation order |
-| CHANGED | `Match` › Domain Events › `MatchStarted` | S47 | build | consumers add Live Activity (in the model since ADR-0001; missed by the baseline derivation) |
-| CHANGED | `Match` › Tests required | S27, S47 | build | unit: `autoPause` refuses a time before the last action; integration: auto-pause after a kill (incl. a lock-screen action after backgrounding), never on backgrounding, before the stale check; lock-screen hand-over |
-| CHANGED | Cross-cutting › Context boundaries › iOS ACL | S27, S28 | build | app lifecycle supplies kill detection and the last background time (was: termination signal) |
+| ADDED | Context **Upgrade** › `Edition` (value objects, aggregate, events, store, use cases, reads, tests) | S49–S53 | build | Whole section below (ADR-0010, ADR-0011) |
+| ADDED | Upgrade › Domain Events › `AppUnlocked`, `AppLocked` | S49, S50, S51, S53 | build | Stage 2: Upgrade's published language, consumed by Matches, Players and Stats (ADR-0011) |
+| ADDED | Upgrade › Read › `CurrentEdition` (open host) | S1–S3, S7, S8, S11, S14–S19, S21, S22, S29, S30, S35, S36, S38–S40, S43, S44, S46, S47, S52 | build | Edition + `FreeLimits`; served from the local cache, works offline (ADR-0011) |
+| CHANGED | `Match` › Aggregate › invariant: how a match was paused | S7, S8, S27, S28 | build | A Paused match knows whether it was paused by hand (`MatchPaused`) or automatically (`MatchAutoPaused`); `ResumeMatch` needs it for the edition guard |
+| CHANGED | `Match` › Use Cases › `StartMatch` | S1, S2, S11, S44 | build | Free: refuse when a match is live (limit 1), and when the style isn't most frames wins or the break rule isn't alternate → upgrade offer |
+| CHANGED | `Match` › Use Cases › `PauseMatch` / `ResumeMatch` | S7, S8, S27, S28 | build | Free: `PauseMatch` refused; `ResumeMatch` refused only for a match paused by hand (auto-paused resumes stay free) |
+| CHANGED | `Match` › Use Cases › `FinishAllMatches`, `OverrideMatchColour` | S43, S46 | build | Paid; the colour-clash offer isn't made while Free |
+| CHANGED | `Match` › Use Cases › `CorrectMatchScore`, `DeleteMatch` | S29, S30 | build | Free: only the newest 10 ended matches; the removal cascade (S42) is never limited |
+| ADDED | `Match` › Use Cases › `RemoveLiveActivityOnLock` | S47, S51 | build | Policy on `AppLocked`; live matches carry on unchanged |
+| ADDED | `Match` › Repository Port › `isAmongNewestEnded(MatchId, n)` | S29, S30 | build | Supports the Free guard without asking Stats |
+| CHANGED | `Match` › Read › `LiveMatchScreen`, `LockScreenState`, `LiveMatches` | S7, S14, S22, S47 | build | Free: head-to-head greyed with an upgrade prompt, the pause button shows "Upgrade now", no colours, no Live Activity |
+| CHANGED | `Template` › Use Cases › `CreateOrUseTemplate` | S12 | build | Runs regardless of edition (recorded silently while Free) |
+| CHANGED | `Template` › Use Cases › `DeleteTemplate`; Read › `TemplateList` | S1, S36 | build | Free: delete refused (the cascade from S42 isn't); the list is replaced by an "Upgrade now" prompt in place |
+| CHANGED | `MatchSettings` › Use Cases › `ChangeMatchDefaults`, `SetLiveMatchLimit`; effective limit | S11, S21, S44 | build | Free: style and break defaults and the limit setting refused; effective limit 1 whatever is stored; the game default (S20) stays free |
+| CHANGED | `Player` › Use Cases › `AddPlayer`, `UnarchivePlayer` | S2, S3, S35, S48 | build | Free: refused when 5 players are active → upgrade offer; players over the cap after a revocation stay |
+| ADDED | `Player` › Repository Port › `countActive()` | S3, S35 | build | Active players only (archived, merged away and removed excluded) |
+| CHANGED | `Player` › Use Cases › `ChangePlayerColour`; Read › colour fields | S22 | build | Free: refused; colours kept but left out of every read while Free |
+| CHANGED | Stats › Read › `PastMatches`, `MatchTimeline` | S17 | build | Free: the newest 10 ended matches plus a hidden count; the timeline only for those |
+| CHANGED | Stats › Read › `HeadToHead`, `Stats(filter)` | S14, S18, S19 | build | Free: locked (no figures returned); the projections keep building so unlocking shows everything at once |
+| CHANGED | `Series` › Use Cases › `CreateSeries`, `ChangeSeries`, `DeleteSeries`, `IssueMonthlySummaries`; Read › `SeriesList`, `MonthlySummary` | S38, S39, S40 | build | Free: refused, and no summary issued; the merge and removal policies (S33, S42) still run |
+| CHANGED | Each context's Tests required | all above | build | Unit and integration coverage for every edition guard; unlock and revoke round trips lose no data |
+| CHANGED | Cross-cutting › Context boundaries | S49–S51 | build | App Store → Upgrade ACL; Upgrade → Matches, Players, Stats open host + published language (ADR-0011) |
+| CHANGED | Cross-cutting › Layering | S49–S51 | build | StoreKit lives only in Upgrade's infrastructure adapter |
+| CHANGED | Open questions › Q6 | — | — | Resolved by ADR-0006 (text tidy-up) |
 
 ---
 
@@ -80,6 +99,7 @@ Caused by ADR-0004 and ADR-0005 (2026-10-05). Hand this section to the planner. 
 - Invariant: while Paused, only `resume`, `finish`, `abandon`, `cancel`, `correctBreaker` are allowed — S7 — build
 - Invariant: an ended match's original events are never altered; corrections are new events — S29, S31 — build
 - Invariant: only a stale match's length can be capped — S28 — build
+- Invariant: a Paused match knows how it was paused (by hand: `MatchPaused`; automatically: `MatchAutoPaused`), for the edition guard on `ResumeMatch` — S7, S8, S27, S28 — build
 
 ### Domain Events
 **Implementation skill:** `ddd-domain-events`
@@ -112,47 +132,50 @@ Stage 2 events are Matches' published language (ADR-0003), consumed by Stats; th
 - `MatchRepository` — `getById`, `save` — S1–S10, S25–S31, S41, S46 — build
   - `findLive()` — live matches, oldest started first (ties by creation order): live list, limit check, finish all, auto-pause, stale check, long-frame timer, lock-screen match — S9, S11, S27, S28, S37, S43, S44, S47 — build
   - `findByPlayer(PlayerId)` — every match with that player: merge repointing, removal cascade — S33, S42 — build
+  - `isAmongNewestEnded(MatchId, n)` — whether an ended match is among the n most recently ended (Free guard for corrections and deletions) — S17, S29, S30 — build
 
 ### Use Cases (command side)
 **Implementation skill:** `ddd-application-layer`
 
-- `StartMatch` — trigger: Scorer (template or details); guards: live-match limit (MatchSettings), "already in a live match" confirmation; load settings → `Match.start` → save → dispatch — S1, S2, S11, S44 — build
+- `StartMatch` — trigger: Scorer (template or details); guards: live-match limit (MatchSettings; **Free: 1**), "already in a live match" confirmation; **Free: style must be most frames wins and break rule alternate, else refused → upgrade offer (S52)**; reads `CurrentEdition` (Upgrade); load settings → `Match.start` → save → dispatch — S1, S2, S11, S44, S52 — build
 - `ChooseBreaker` — trigger: Scorer — S4 — build
 - `CorrectBreaker` — trigger: Scorer (match menu) — S41 — build
 - `AwardFrame` — trigger: Scorer (in app or lock screen) — S5, S47 — build [?] (Q3, Q4)
 - `RemoveFrame` — trigger: Scorer (−, or Undo on a prompt) — S6, S15, S16 — build [?] (Q4)
-- `PauseMatch` / `ResumeMatch` — trigger: Scorer (in app or lock screen); `ResumeMatch` also from the stale prompt — S7, S8, S28, S47 — build
+- `PauseMatch` / `ResumeMatch` — trigger: Scorer (in app or lock screen); `ResumeMatch` also from the stale prompt; **Free: `PauseMatch` refused → "Upgrade now" on the pause button (S52); `ResumeMatch` refused for a match paused by hand, allowed for one auto-paused after a kill** — S7, S8, S27, S28, S47, S52 — build
 - `AutoPauseLiveMatches` — trigger: App lifecycle (launch, when the last session was killed rather than returned to the foreground); input: the last background time, if recorded (cleared on each return to the foreground); `findLive` → `autoPause(at:)` each running match, `at` = the later of the background time and that match's last action (the last action when no background time was recorded); already-paused matches untouched; runs before `FlagStaleMatches` — S27 — build
 - `FinishMatch` — trigger: Scorer (menu + confirmation, or Finish prompt); early finish of a target style → returns "will be abandoned" unless `anyway` — S10, S15, S16 — build
 - `AbandonMatch` — trigger: Scorer (menu + confirmation) — S25 — build
 - `CancelMatch` — trigger: Scorer (menu + confirmation) — S26 — build
-- `FinishAllMatches` — trigger: Scorer (live list + confirmation); finishable → `finish`, others → `abandon`, one dialog if any will be abandoned — S43 — build
+- `FinishAllMatches` — trigger: Scorer (live list + confirmation); finishable → `finish`, others → `abandon`, one dialog if any will be abandoned; **paid** (Free has one live match) — S43, S52 — build
 - `FlagStaleMatches` — trigger: App lifecycle (launch); `findLive` filtered by idle ≥ 6 h; queries Stats for averages; prompts one at a time — S28 — build
 - `ResolveStaleMatch` — trigger: Scorer's choice in the stale prompt — S28 — build
 - `WarnLongFrame` — trigger: Clock (local notification schedule: 30 min, then every 10; rescheduled on `FrameWon`/`MatchResumed`, cancelled on pause or end) — S37 — build
-- `OverrideMatchColour` — trigger: policy on `MatchStarted` when sides share a colour (Scorer accepts) — S46 — build
-- `CorrectMatchScore` — trigger: Scorer (timeline → Edit) — S29 — build [?] (Q1, Q2)
+- `OverrideMatchColour` — trigger: policy on `MatchStarted` when sides share a colour (Scorer accepts); **not offered while Free** (no colours shown) — S46 — build
+- `CorrectMatchScore` — trigger: Scorer (timeline → Edit); **Free: only if `isAmongNewestEnded(id, 10)`** — S29 — build [?] (Q1, Q2)
 - `MarkMatchFinished` — trigger: Scorer — S31 — build
-- `DeleteMatch` — trigger: Scorer (swipe + confirmation); policy on `PlayerRemoved` (each of their matches) — S30, S42 — build
+- `DeleteMatch` — trigger: Scorer (swipe + confirmation); policy on `PlayerRemoved` (each of their matches); **Free: Scorer deletions only if `isAmongNewestEnded(id, 10)`; the S42 cascade is never limited** — S30, S42 — build
 - `MovePlayerMatches` — trigger: policy on `PlayersMerged` (Players); repoints `PlayerId` in every match of the folded-in player, recorded as a correction — S33 — build
+- `RemoveLiveActivityOnLock` — trigger: policy on `AppLocked` (Upgrade); removes the Live Activity; live matches carry on unchanged (style, break rule, pauses kept) — S47, S51 — build
 
 ### Read Requirements (query side)
 **Implementation skill:** `ddd-cqrs`
 
-- `LiveMatches` — fields: match id, players, colours, score, match timer, paused; oldest started first; bypasses the domain model — S9, S11, S43 — build
-- `LiveMatchScreen` — fields: day + time, sides with colours, score (sets format), breaker dot, match timer, frame timer, paused, available controls, head-to-head (from Stats) — S1, S2, S4–S8, S14, S16 — build
-- `LockScreenState` — the oldest live match (as `findLive`), none if no live match; fields: match id, sides, score, breaker, frame timer, paused; moves to the next-oldest when the shown match is finished, abandoned or cancelled — S47 — build [?] (Q4)
+- `LiveMatches` — fields: match id, players, colours, score, match timer, paused; oldest started first; bypasses the domain model; colours omitted while Free — S9, S11, S43 — build
+- `LiveMatchScreen` — fields: day + time, sides with colours, score (sets format), breaker dot, match timer, frame timer, paused, available controls, head-to-head (from Stats); **Free:** no colours, head-to-head greyed with an upgrade prompt, pause button shows "Upgrade now" — S1, S2, S4–S8, S14, S16, S22, S52 — build
+- `LockScreenState` — **Unlocked only (none while Free)**; the oldest live match (as `findLive`), none if no live match; fields: match id, sides, score, breaker, frame timer, paused; moves to the next-oldest when the shown match is finished, abandoned or cancelled — S47 — build [?] (Q4)
 - `IsPlayerInLiveMatch(PlayerId)` — open host for Players' archive guard; also the "are you sure" check on start — S11, S34 — build
 - `HavePlayedEachOther(PlayerId, PlayerId)` — open host for Players' merge guard — S33 — build
 
 ### Persistence note
-Event-sourced: **yes** — the business owner decided that a match's in-game actions are events on its stream and post-end changes are alterations (`docs/domain/decisions.md` › *Notes for later passes*). Not yet an ADR: [?] Q6. **Implementation skill:** `ddd-event-sourcing`
+Event-sourced: **yes** — the business owner decided that a match's in-game actions are events on its stream and post-end changes are alterations (ADR-0006). **Implementation skill:** `ddd-event-sourcing`
 
 ### Tests required
 **Implementation skill:** `ddd-testing`
 
 - Domain unit: every behaviour and guard above (each allowed and each refused transition of `MatchStatus`); `autoPause` refuses a time before the last action; `Target` (best of odd only, ⌈M/2⌉, display); `Setup` equality (unordered players, best-of = race-to); breaker derivation (alternate, winner breaks, after −, after correction, across sets); frame length minus paused time; − leaves timers alone; set win and its revert; early finish of target styles; end time = winning frame time; draws; stale detection at 6 h; `ChosenEndTime` bounds; capped length fallback 3 h; long-frame thresholds 30/10; race-to correction validity; sets correction warnings; abandoned → finished only
 - Integration: one per use case and read requirement above, including the live-match limit, finish all with mixed matches, auto-pause after a kill (at the background time; at a later lock-screen action when there is one; at the last action when the app was on screen; never on backgrounding), auto-pause before the stale check, lock-screen hand-over to the next-oldest live match, stale prompt order
+- Edition (ADR-0010): unit — the pause-kind invariant; integration — Free refuses a 2nd live match, other styles and break rules, manual pause, resuming a manual pause, corrections and deletions beyond the newest 10; Free allows auto-pause and its resume; `AppLocked` removes the Live Activity and leaves live matches unchanged
 
 ---
 
@@ -194,14 +217,14 @@ Event-sourced: **yes** — the business owner decided that a match's in-game act
 ### Use Cases (command side)
 **Implementation skill:** `ddd-application-layer`
 
-- `CreateOrUseTemplate` — trigger: policy on `MatchStarted`; `findBySetup` → `create` or `recordUse` → save — S1, S2, S12 — build
-- `DeleteTemplate` — trigger: Scorer (swipe); policy on `PlayerRemoved` — S36, S42 — build
+- `CreateOrUseTemplate` — trigger: policy on `MatchStarted`; `findBySetup` → `create` or `recordUse` → save; runs whatever the edition (silently while Free) — S1, S2, S12 — build
+- `DeleteTemplate` — trigger: Scorer (swipe); policy on `PlayerRemoved`; **Free: Scorer deletion refused; the S42 cascade is never limited** — S36, S42 — build
 - `CombineTemplatesAfterMerge` — trigger: policy on `PlayersMerged` — S33 — build
 
 ### Read Requirements (query side)
 **Implementation skill:** `ddd-cqrs`
 
-- `TemplateList` — fields: template id, players (names, colours), game, style + targets as entered, break rule, use count; most used first; excludes templates with an archived player; empty list → New Match opens the details screen directly — S1, S2, S34 — build
+- `TemplateList` — fields: template id, players (names, colours), game, style + targets as entered, break rule, use count; most used first; excludes templates with an archived player; empty list → New Match opens the details screen directly; **Free: replaced by an "Upgrade now" prompt in place** — S1, S2, S34, S52 — build
 
 ### Persistence note
 Event-sourced: no
@@ -210,7 +233,7 @@ Event-sourced: no
 **Implementation skill:** `ddd-testing`
 
 - Domain unit: create, recordUse, combine (counts add), delete; one-per-setup
-- Integration: create-or-use on start, deleted template recreated with count 1, merge combining, list ordering and archived hiding, empty list routing
+- Integration: create-or-use on start, deleted template recreated with count 1, merge combining, list ordering and archived hiding, empty list routing; templates recorded while Free appear on unlock; Free refuses deletion and shows the prompt
 
 ---
 
@@ -222,7 +245,7 @@ Event-sourced: no
 **Implementation skill:** `ddd-tactical-patterns`
 
 - `MatchDefaults` — `Game` (pool), `MatchStyle` (mostFramesWins), `BreakRule` (alternate) — S2, S20, S21 — build
-- `LiveMatchLimit` — 1…100, default 10 — S11, S44 — build
+- `LiveMatchLimit` — 1…100, default 10; effective limit 1 while Free, whatever is stored — S11, S44 — build
 
 ### Aggregate
 **Implementation skill:** `ddd-tactical-patterns`
@@ -242,8 +265,8 @@ None (settings; no undo case).
 ### Use Cases (command side)
 **Implementation skill:** `ddd-application-layer`
 
-- `ChangeMatchDefaults` — trigger: Scorer (settings) — S20, S21 — build
-- `SetLiveMatchLimit` — trigger: Scorer (settings) — S44 — build
+- `ChangeMatchDefaults` — trigger: Scorer (settings); **Free: style and break-rule changes refused; the game (S20) stays free** — S20, S21 — build
+- `SetLiveMatchLimit` — trigger: Scorer (settings); **paid** — S44, S52 — build
 
 ### Read Requirements (query side)
 **Implementation skill:** `ddd-cqrs`
@@ -257,7 +280,7 @@ Event-sourced: no
 **Implementation skill:** `ddd-testing`
 
 - Domain unit: initial defaults, limit bounds, invalid targets refused
-- Integration: defaults applied to the details screen; limit enforced by `StartMatch`
+- Integration: defaults applied to the details screen; limit enforced by `StartMatch`; Free uses limit 1 and the Free defaults
 
 ---
 
@@ -305,23 +328,24 @@ Event-sourced: no
 - `PlayerRepository` — `getById`, `save` — S3, S22, S32–S35, S42 — build
   - `findByName(PlayerName)` — case-insensitive, including archived — S2, S3, S32 — build
   - `nextUnusedColour()` — from colours of existing players — S3 — build
+  - `countActive()` — active players only (archived, merged away, removed excluded): Free cap — S3, S35 — build
 
 ### Use Cases (command side)
 **Implementation skill:** `ddd-application-layer`
 
-- `AddPlayer` — trigger: Scorer (new name on the details screen, welcome); archived name → error offering `RemovePlayer` — S2, S3, S48 — build
+- `AddPlayer` — trigger: Scorer (new name on the details screen, welcome); archived name → error offering `RemovePlayer`; **Free: refused when `countActive()` ≥ 5 → upgrade offer** — S2, S3, S48, S52 — build
 - `RenamePlayer` — trigger: Scorer (settings) — S32 — build
-- `ChangePlayerColour` — trigger: Scorer (settings) — S22 — build
+- `ChangePlayerColour` — trigger: Scorer (settings); **paid** — S22, S52 — build
 - `MergePlayers` — trigger: Scorer (settings); asks Matches `HavePlayedEachOther` — S33 — build
 - `ArchivePlayer` — trigger: Scorer (settings); asks Matches `IsPlayerInLiveMatch` — S34 — build
-- `UnarchivePlayer` — trigger: Scorer (settings) — S35 — build
+- `UnarchivePlayer` — trigger: Scorer (settings); **Free: refused when `countActive()` ≥ 5 → upgrade offer** — S35, S52 — build
 - `RemovePlayer` — trigger: Scorer (settings, or the offer from S2/S3/S32) + confirmation — S42 — build
 
 ### Read Requirements (query side)
 **Implementation skill:** `ddd-cqrs`
 
-- `PlayerSuggestions(prefix)` — fields: id, name, colour; active players only, case-insensitive prefix match — S2, S3 — build
-- `PlayersList` — fields: id, name, colour, status; active and archived sections — S22, S32–S35, S42 — build
+- `PlayerSuggestions(prefix)` — fields: id, name, colour; active players only, case-insensitive prefix match; colour omitted while Free — S2, S3 — build
+- `PlayersList` — fields: id, name, colour, status; active and archived sections; colour omitted while Free — S22, S32–S35, S42 — build
 
 ### Persistence note
 Event-sourced: no
@@ -330,7 +354,7 @@ Event-sourced: no
 **Implementation skill:** `ddd-testing`
 
 - Domain unit: name uniqueness case-insensitive; archived-name block; palette next/repeat; every `PlayerStatus` transition allowed and refused
-- Integration: merge refused when they played each other; archive refused while in a live match; removal cascades (matches, templates, series, Me)
+- Integration: merge refused when they played each other; archive refused while in a live match; removal cascades (matches, templates, series, Me); Free cap of 5 active (archived excluded, Me included) on add and unarchive; players over the cap after a revocation stay
 
 ---
 
@@ -419,16 +443,16 @@ Event-sourced: no
 ### Use Cases (command side)
 **Implementation skill:** `ddd-application-layer`
 
-- `CreateSeries` — trigger: Scorer (Series screen) — S39 — build
-- `ChangeSeries` / `DeleteSeries` — trigger: Scorer (Series screen) — S40 — build
+- `CreateSeries` — trigger: Scorer (Series screen); **paid** — S39, S52 — build
+- `ChangeSeries` / `DeleteSeries` — trigger: Scorer (Series screen); **paid** — S40, S52 — build
 - `RepointSeriesOnMerge` — trigger: policy on `PlayersMerged` — S33 — build
 - `RemovePlayerFromSeries` — trigger: policy on `PlayerRemoved` — S42 — build
-- `IssueMonthlySummaries` — trigger: Clock (1st of the month, for the previous month) — S38 — build [?] (Q5)
+- `IssueMonthlySummaries` — trigger: Clock (1st of the month, for the previous month); **skipped while Free** — S38 — build [?] (Q5)
 
 ### Read Requirements (query side)
 **Implementation skill:** `ddd-cqrs`
 
-- `SeriesList` — fields: id, name, setups — S39, S40 — build
+- `SeriesList` — fields: id, name, setups; locked while Free — S39, S40, S52 — build
 - `MonthlySummary(series, month)` — fields: per-pairing (or "you" when Me is in the series) matches W–D–L, frames, deciders; change since the previous month — S38 — build
 
 ### Persistence note
@@ -438,7 +462,7 @@ Event-sourced: no
 **Implementation skill:** `ddd-testing`
 
 - Domain unit: create, change, delete, summary guard
-- Integration: membership by setup (past and future), several series per setup, merge/removal policies, summary only for series with matches, "you" vs per-pairing
+- Integration: membership by setup (past and future), several series per setup, merge/removal policies, summary only for series with matches, "you" vs per-pairing; Free refuses series commands and issues no summary, while merge and removal policies still run
 
 ---
 
@@ -447,10 +471,10 @@ Event-sourced: no
 Projections over Matches' and Players' published events (ADR-0003). No aggregate; bypass the domain model. **Implementation skill:** `ddd-cqrs`
 
 - `MatchRecord` projection — from all Stage 2 match events: result (win/draw), status (finished/abandoned/cancelled), sides, setup, start/end, length, frames, corrections; rebuilt on `MatchScoreCorrected`, `MatchMarkedFinished`; removed on `MatchDeleted` — S10, S17, S25, S26, S29, S30, S31 — build
-- `PastMatches` — fields: day + time, players, score, style, finished/abandoned; newest first; filters: show cancelled, include archived players — S17 — build
-- `MatchTimeline` — fields: per frame: winner, frame time, match time at that point, running score; corrections marked — S17 — build
-- `HeadToHead(PlayerId, PlayerId)` — open host for Matches' live screen; fields: Matches W–D–L, Frames, Deciders (only when non-zero); all finished matches, any game, any style — S14 — build
-- `Stats(filter)` — groups: opponent, weekday (combinable); filters: opponent, weekday, game, style, series, date range, include abandoned, include archived players; fields: matches W–D–L, frames won–lost, deciders, match deciders, set deciders, win %, average frame time; point of view: Me or a chosen player — S18, S19 — build
+- `PastMatches` — fields: day + time, players, score, style, finished/abandoned; newest first; filters: show cancelled, include archived players; **Free: the newest 10 ended matches plus a count of hidden ones (tapping it opens the upgrade offer); all on unlock** — S17, S52 — build
+- `MatchTimeline` — fields: per frame: winner, frame time, match time at that point, running score; corrections marked; Free: only for the visible matches — S17 — build
+- `HeadToHead(PlayerId, PlayerId)` — open host for Matches' live screen; fields: Matches W–D–L, Frames, Deciders (only when non-zero); all finished matches, any game, any style; **locked while Free** (returns no figures) — S14 — build
+- `Stats(filter)` — groups: opponent, weekday (combinable); filters: opponent, weekday, game, style, series, date range, include abandoned, include archived players; fields: matches W–D–L, frames won–lost, deciders, match deciders, set deciders, win %, average frame time; point of view: Me or a chosen player; **locked while Free** — S18, S19, S52 — build
 - `Deciders` computation — decider: frame won from level at the end of a set or frames-style match, any set; match decider: such a frame that is the match's last (also a decider); set decider: deciding set with sets level (own tally, never a match decider) — S10, S14, S18 — build
 - `AverageFrameTime(PlayerId)` — open host for Matches' stale prompt — S28 — build
 - `AverageMatchLength(players, weekday)` — finished matches only; nil when none (Matches falls back to 3 h) — S28 — build
@@ -459,7 +483,70 @@ Projections over Matches' and Players' published events (ADR-0003). No aggregate
 **Implementation skill:** `ddd-testing`
 
 - Domain unit (pure functions): decider rules with the worked examples (3–1 / 9–8 → match decider; 3–2 / 9–5 → set decider only; 3–2 / 9–8 → both; earlier-set 9–8 → decider only); W–D–L with draws; inclusion rules (finished only by default; abandoned opt-in; cancelled never; archived opt-in)
-- Integration: projections rebuilt correctly after corrections and deletions; head-to-head excludes the live match
+- Integration: projections rebuilt correctly after corrections and deletions; head-to-head excludes the live match; projections keep building while Free; Free shows the newest 10 and locks head-to-head and stats; unlock shows everything with no rebuild
+
+---
+
+# Context: Upgrade (Generic)
+
+## Edition
+
+**Business behaviours:** Know whether this device is Free or Unlocked. Unlock it only after the App Store verifies the one-off purchase, whether now, after an Ask to Buy approval (even after a restart), or through a restore. Return it to Free when the App Store revokes the purchase. Serve the edition and the Free limits to the other contexts from a local cache that offline never re-locks. Sell the upgrade with an offer in place (templates, pause), a generic screen for other paid features, and a benefits menu item shown only while Free.
+It must prevent: unlocking without a verified purchase; re-locking because the device is offline; showing the offer on launch or as a repeated pop-up; deleting or rewriting any other context's data — S49, S50, S51, S52, S53
+
+### Value Objects
+**Implementation skill:** `ddd-tactical-patterns`
+
+- `EditionStatus` — `free` (initial) | `unlocked`; allowed transitions: free → unlocked; unlocked → free; no other — S49, S50, S51 — build
+- `FreeLimits` — live matches 1; active players 5; visible ended matches 10; allowed styles {most frames wins}; allowed break rules {alternate}; one table, owned here (ADR-0011) — S1–S3, S11, S17, S21, S29, S30, S35, S44 — build
+- `PaidFeature` — templates, manualPause, raceTo, sets, winnerBreaks, extraPlayers, fullHistory, colours, headToHead, stats, series, severalLiveMatches, lockScreen — S1, S7, S8, S11, S14–S19, S21, S22, S36, S38–S40, S43, S44, S46, S47, S52, S53 — build
+- `UnlockProductId` — the single non-consumable product identifier — S49, S50 — build
+
+### Aggregate
+**Implementation skill:** `ddd-tactical-patterns`
+
+- Factory: `Edition.initial` — status free — S49 — build
+- Behaviour: `unlock()` — guard: free (idempotent when already unlocked: no event); called only with a verified purchase from the adapter; raises `AppUnlocked` — S49, S50 — build
+- Behaviour: `lock()` — guard: unlocked (idempotent when free: no event); raises `AppLocked` — S51 — build
+- Query: `allows(PaidFeature) -> Bool`, `limits -> FreeLimits?` (nil when unlocked) — S52 and every guarded scenario — build
+- Invariant: the status changes only through `unlock` and `lock`, never because a check failed or the device is offline — S49, S51 — build
+
+### Domain Events
+**Implementation skill:** `ddd-domain-events`
+
+Stage 2 events are Upgrade's published language (ADR-0011), consumed by Matches, Players and Stats; in-process, versioned shape.
+
+- `AppUnlocked` — raised by `unlock`; Stage 2 (Matches, Players, Stats; benefits menu item hidden) — S49, S50, S53 — build
+- `AppLocked` — raised by `lock`; Stage 2 (Matches removes the Live Activity; benefits menu item shown) — S51, S53, S47 — build
+
+### Repository Port
+**Implementation skill:** `ddd-repositories`
+
+- `EditionStore` — `get`, `save` (single per device, cached locally; survives offline launches) — S49, S50, S51 — build
+- `AppStorePort` — `purchase(UnlockProductId) -> purchased | pending | cancelled | failed`, `restore() -> unlockOnRecord: Bool`, `transactionUpdates` (verified, revoked) — S49, S50, S51 — build
+
+### Use Cases (command side)
+**Implementation skill:** `ddd-application-layer`
+
+- `PurchaseUnlock` — trigger: Scorer (Buy on the offer or benefits screen); `AppStorePort.purchase` → purchased: `unlock` → save → dispatch; pending: nothing yet (an approval later arrives through `HandleAppStoreUpdate`); cancelled or failed: nothing changes — S49, S52, S53 — build
+- `RestorePurchases` — trigger: Scorer (Restore link); unlock on record → `unlock`; none → "Nothing to restore" — S50 — build
+- `HandleAppStoreUpdate` — trigger: App Store transaction updates at launch and while running (via ACL); verified unlock → `unlock`; revocation → `lock`; save → dispatch — S49, S51 — build
+- `ShowUpgradeOffer(PaidFeature)` — trigger: a refused guard in Matches, Players or Stats, or a tap on a paid feature; in place for templates and pause, the generic screen otherwise; raises nothing — S52 — build
+
+### Read Requirements (query side)
+**Implementation skill:** `ddd-cqrs`
+
+- `CurrentEdition` — open host for Matches, Players, Stats; fields: status, `FreeLimits` (when free), `allows(PaidFeature)`; served from `EditionStore`, never waits on the App Store — S1–S3, S7, S8, S11, S14–S19, S21, S22, S29, S30, S35, S36, S38–S40, S43, S44, S46, S47, S52 — build
+- `BenefitsScreen` — fields: the list of paid features in plain language, price (from the App Store, localised), Buy, Restore; shown only while free; the menu item is visible only while free — S52, S53 — build
+
+### Persistence note
+Event-sourced: no
+
+### Tests required
+**Implementation skill:** `ddd-testing`
+
+- Domain unit: `EditionStatus` transitions allowed and refused; `unlock` and `lock` idempotency; `allows` for every `PaidFeature` in both editions; `FreeLimits` values
+- Integration (fake `AppStorePort`): purchase purchased, pending then approved later (including after a restart), cancelled and failed; restore with and without a purchase on record; revocation → `AppLocked`; offline launch keeps the cached edition; benefits menu item hidden on `AppUnlocked` and shown on `AppLocked`; an unlock then revoke round trip deletes no match, player, template or series
 
 ---
 
@@ -470,6 +557,7 @@ Projections over Matches' and Players' published events (ADR-0003). No aggregate
 
 - Per context: domain (no dependencies: no SwiftUI, SwiftData/Core Data, ActivityKit, UserNotifications), application (use cases and ports), infrastructure (persistence, iOS adapters), presentation (SwiftUI). Dependency rule enforced by Swift package / module boundaries — all contexts — build
 - Contexts are separate modules; a context depends on another only through its published events and open-host queries — all — build
+- StoreKit appears only in Upgrade's infrastructure adapter (`AppStorePort`); the Matches, Players and Stats domains see only `CurrentEdition`, `AppUnlocked`, `AppLocked` — S49–S51 — build
 
 ## Context boundaries (from strategic design)
 - Players → Matches: Customer/Supplier (names, colours, player events) — ADR-0002
@@ -477,12 +565,15 @@ Projections over Matches' and Players' published events (ADR-0003). No aggregate
 - Matches → Stats: Published language, Stats conformist (all Stage 2 match events) — ADR-0003
 - Players → Stats: Published language, Stats conformist (player events, `WhoAmI`) — ADR-0003
 - Stats → Matches: Open host service (`HeadToHead`, `AverageFrameTime`, `AverageMatchLength`) — ADR-0003
+- App Store → Upgrade: Anti-corruption layer (StoreKit transactions, Ask to Buy approvals, revocations → `unlock` / `lock`) — ADR-0011
+- Upgrade → Matches, Players, Stats: Open host service + published language, downstream conformist (`CurrentEdition`; `AppUnlocked`, `AppLocked`); each downstream enforces `FreeLimits` on its own data — ADR-0011
 - Matches, Stats → iOS: Anti-corruption layer — adapters for UserNotifications (S37, S38), ActivityKit Live Activities + App Intents for lock-screen buttons (S47), app lifecycle launch signals, incl. kill detection and the last background time (S27, S28); no iOS types inside a domain — build
 
 ## Design-for-later constraints (from decisions.md)
 - A `Frame` must be extensible with a loss reason (S23, later) and a snooker points breakdown by colour without remodelling — Matches — build
 - A match's event history must be able to accept events from more than one device (shared matches, later) — Matches — build
 - All saved state must be uploadable in full (S24, later): persistence must allow exporting every match's full history and all players, templates, series and settings — all — build
+- Free limits never delete or rewrite data: hidden matches, unshown colours and silently recorded templates must all be intact on unlock — all — build (ADR-0010)
 
 ## Open questions blocking items
 All deferred by the business owner to implementation; they do not block the MVP.
@@ -494,4 +585,4 @@ All deferred by the business owner to implementation; they do not block the MVP.
 | Q3 | `AwardFrame` — + while a Finish/Continue prompt shows | S5, S15, S16 | Business owner |
 | Q4 | `AwardFrame` / `RemoveFrame` / `LockScreenState` — simultaneous lock-screen + and in-app − | S6, S47 | Business owner |
 | Q5 | `Series.issueSummary` — match ending during summary | S38 | Business owner |
-| Q6 | `Match` persistence — record the event-sourcing decision as an ADR | S1–S31 | Business owner |
+| ~~Q6~~ | `Match` persistence — resolved by ADR-0006 | S1–S31 | — |

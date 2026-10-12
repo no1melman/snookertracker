@@ -3,7 +3,7 @@
 **Type:** AUTO
 **Status:** new [?]
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: paid)
 **Actor:** policy (reaction to `FrameWon`)
 **Trigger / interface:** A frame takes a player to the race-to target
 **Description:** The app asks "Asher wins 9–8. Finish?" with Finish and Undo. The match only ends on Finish; Undo takes the frame back off.
@@ -16,6 +16,7 @@
 - none
 
 ## Rules
+- **Edition (ADR-0010):** Paid (race to and best of). Matches already live when the purchase is revoked (51) keep their style and run to the end
 - Only race-to style
 - The end time is when the winning frame was scored, not when Finish was tapped
 

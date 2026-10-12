@@ -3,7 +3,7 @@
 **Type:** AUTO
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: still records silently while Free)
 **Actor:** policy (reaction to `MatchStarted`)
 **Trigger / interface:** `MatchStarted`
 **Description:** Every new setup becomes a template as soon as its match starts; an existing setup's use count goes up. A template is identified by its whole setup: the two players (order doesn't matter), the game, the match style with its targets, and the break rule. Templates are listed most used first.
@@ -16,6 +16,7 @@
 - The match's setup
 
 ## Rules
+- **Edition (ADR-0010):** Templates are created and used silently while Free, so they are there on unlock; they are not shown until then
 - Setup identity is unordered in players ("Callum vs Asher" = "Asher vs Callum"); "best of 3" and "race to 2" are the same setup
 - A deleted template comes back when the setup is played again; its use count restarts from that match
 - Cancelled matches still count (the template is created at start)

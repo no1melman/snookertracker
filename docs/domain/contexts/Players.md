@@ -1,7 +1,7 @@
 # Bounded Context Canvas — Players
 
 **Classification:** Supporting
-**Strategic revision:** ADR-0001 · boundaries: ADR-0002
+**Strategic revision:** ADR-0001 · boundaries: ADR-0002 · ADR-0011
 
 ## Purpose
 Who plays: each person's unique name and colour, archiving, merging and removing them, and which player is "Me" on this device. Says nothing about how anyone is doing; that is Stats.
@@ -15,6 +15,7 @@ Who plays: each person's unique name and colour, archiving, merging and removing
 
 | Source | Type | Description |
 |--------|------|-------------|
+| Upgrade | Query / Event | Current edition and Free limits; `AppUnlocked`, `AppLocked` (conformist, ADR-0011) |
 | Scorer | Command | AddPlayer, RenamePlayer, ChangePlayerColour, MergePlayers, ArchivePlayer, UnarchivePlayer, RemovePlayer, SetMe |
 | Matches | Query (Matches' open host) | "Is this player in a live match?" (archive guard); "Have these two ever played each other?" (merge guard) |
 
@@ -64,6 +65,7 @@ Who plays: each person's unique name and colour, archiving, merging and removing
 ---
 
 ## Business Rules
+- **Free edition (ADR-0010, ADR-0011):** at most 5 active players (Me included, archived not counted) for AddPlayer and UnarchivePlayer; colours kept but not shown. Refused actions open the upgrade offer (Upgrade).
 - Names are unique case-insensitively and never blank.
 - An archived player's name can't be reused unless that player is removed.
 - Archiving is refused while the player is in a live match.
@@ -79,6 +81,7 @@ Who plays: each person's unique name and colour, archiving, merging and removing
 
 | External Context | Relationship | Translation Needed? |
 |-----------------|--------------|---------------------|
+| Upgrade | Conformist to its open host + published language | No |
 | Matches | Uses Matches' two published questions | No |
 
 ## Team

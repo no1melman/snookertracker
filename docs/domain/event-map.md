@@ -40,8 +40,12 @@
 | `SeriesChanged` | `Series` | `ChangeSeries` ← Scorer; policy on `PlayersMerged` / `PlayerRemoved` | none | 40, 33, 42 |
 | `SeriesDeleted` | `Series` | `DeleteSeries` ← Scorer | none | 40 |
 | `SeriesSummaryIssued` | `Series` | `IssueSeriesSummary` ← Clock | → iOS Notifications | 38 |
+| `AppUnlocked` | `Edition` | `Unlock` ← Scorer via App Store purchase (S49) or restore (S50); App Store approval arriving later (Ask to Buy) | → paid features and hidden matches shown; Upgrade menu item hidden (S53) | 49, 50, 53 |
+| `AppLocked` | `Edition` | `Lock` ← App Store revocation (refund, Family Sharing ended) | → Free limits apply; Upgrade menu item shown (S53); Live Activity removed (S47) | 51, 53, 47 |
 
 Settings (`Preferences`: defaults, live-match limit, Me) raise nothing: scenarios 20, 21, 44, 45.
+
+Free-edition limits (ADR-0010) are rules read from `Edition` at the point of entry in the limited scenarios, not events. Touching a paid feature while Free shows the upgrade offer (S52), which raises nothing.
 
 ## Policies (when X → then Y)
 
@@ -65,6 +69,9 @@ Settings (`Preferences`: defaults, live-match limit, Me) raise nothing: scenario
 | `LongFrameWarned` / `SeriesSummaryIssued` | notify | iOS Notifications | 37, 38 |
 | `PlayersMerged` | `MovePlayer` each; `CombineTemplates`; `ChangeSeries`; Me follows | `Match`, `Template`, `Series`, `Preferences` | 33 |
 | `PlayerRemoved` | `DeleteMatch` each; `DeleteTemplate` each; `ChangeSeries`; clear Me | `Match`, `Template`, `Series`, `Preferences` | 42 → 30 |
+| a paid feature touched while Free | show upgrade offer (in place for templates and pause; generic screen otherwise) | — | 1, 2, 3, 7, 8, 11, 14–16, 18, 19, 21, 22, 35, 36, 38–40, 43, 44, 46, 47 → 52 |
+| `AppUnlocked` / `AppLocked` | hide / show the Upgrade menu item; show / hide matches beyond the newest 10 | — | 49, 50, 51 → 53, 17 |
+| `AppLocked` | remove Live Activity | iOS Lock Screen | 51 → 47 |
 
 ## Aggregate lifecycles
 
@@ -162,3 +169,14 @@ stateDiagram-v2
 ```
 
 Single per device; raises no events.
+
+### Edition
+
+```mermaid
+stateDiagram-v2
+  [*] --> Free : install
+  Free --> Unlocked : Unlock / AppUnlocked [S49,S50]
+  Unlocked --> Free : Lock / AppLocked [S51]
+```
+
+Single per device, cached locally; offline never re-locks. Read by every limited scenario (ADR-0010).

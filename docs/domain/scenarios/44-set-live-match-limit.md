@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: paid)
 **Actor:** Scorer
 **Trigger / interface:** Settings → maximum live matches
 **Description:** Caps how many matches can be live at once.
@@ -15,6 +15,7 @@
 - A number
 
 ## Rules
+- **Edition (ADR-0010):** Paid. While the edition is Free, this opens the upgrade offer (→ 52). While Free the limit is fixed at 1
 - Default 10; 1 to 100
 
 ## Flow

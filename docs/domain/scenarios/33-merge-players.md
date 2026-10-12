@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline), ADR-0009 (matches move with `MatchPlayerMoved`)
+**History:** ADR-0001 (baseline), ADR-0009 (matches move with `MatchPlayerMoved`) · ADR-0010 (changed: available while Free)
 **Actor:** Scorer
 **Trigger / interface:** Settings → Players → merge: pick the player to keep and the one to fold in
 **Description:** For two records of the same person ("Cal" and "Callum"). Every match, template and series setup of the folded-in player moves to the kept one; the folded-in player is gone.
@@ -15,6 +15,7 @@
 - Player to keep, player to fold in
 
 ## Rules
+- **Edition (ADR-0010):** Free. Merging reduces the active player count (→ 3)
 - Refused if the two have ever played each other (it would create a match against yourself)
 - Templates that become identical combine into one; use counts add up
 - If the folded-in player was "Me", Me follows the kept player

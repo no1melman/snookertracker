@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new [?]
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: Free edition limited to visible matches)
 **Actor:** Scorer
 **Trigger / interface:** Past match timeline → Edit: + and − per player, plus a text box to type a whole score; for sets, each set's frame score is shown separately and edited per set
 **Description:** Corrects a finished or abandoned match. Recorded as a correction after the end; the original result stays in the history. Winner, deciders and stats are recalculated.
@@ -15,6 +15,7 @@
 - New score (per set for sets)
 
 ## Rules
+- **Edition (ADR-0010):** Free: only the newest 10 ended matches (the visible ones) can be corrected
 - Race to: exactly one player on the target (race to 9 accepts 9–7; refuses 7–5 and 9–9)
 - Sets: the app does not recalculate; it checks consistency and warns (e.g. "4–5 means the right-hand player won this set. Correct?"); confirming saves anyway
 - Cancelled matches cannot be corrected

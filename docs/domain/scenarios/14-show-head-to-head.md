@@ -3,7 +3,7 @@
 **Type:** AUTO
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: paid)
 **Actor:** policy (reaction to `MatchStarted`)
 **Trigger / interface:** `MatchStarted`; shown on the live match screen
 **Description:** The live screen shows the all-time head-to-head for the two players, in order: Matches (won–drawn–lost), Frames, Deciders (only shown when there is a value).
@@ -16,6 +16,7 @@
 - The two players
 
 ## Rules
+- **Edition (ADR-0010):** Paid. While Free, the live screen shows a greyed head-to-head with an upgrade prompt (→ 52)
 - Counts every **finished** match between the two players, in any game and any style; abandoned and cancelled excluded
 - The live match itself is not included
 

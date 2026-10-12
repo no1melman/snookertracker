@@ -1,7 +1,7 @@
 # Bounded Context Canvas — Stats
 
 **Classification:** Core
-**Strategic revision:** ADR-0001 · boundaries: ADR-0003
+**Strategic revision:** ADR-0001 · boundaries: ADR-0003 · ADR-0011
 
 ## Purpose
 Turns the history of matches into insight: past matches and their timelines, head-to-head, stats by opponent and day of the week, deciders, and series with monthly summaries. Read-side, built from Matches' and Players' published events; the only thing written here is a series.
@@ -15,6 +15,7 @@ Turns the history of matches into insight: past matches and their timelines, hea
 
 | Source | Type | Description |
 |--------|------|-------------|
+| Upgrade | Query / Event | Current edition and Free limits; `AppUnlocked`, `AppLocked` (conformist, ADR-0011) |
 | Matches | Event (published language) | All match events, taken as published; builds match records, deciders and figures |
 | Players | Event (published language) | Player events: names, archived, merged, removed |
 | Players | Query | Who "Me" is |
@@ -66,6 +67,7 @@ Turns the history of matches into insight: past matches and their timelines, hea
 ---
 
 ## Business Rules
+- **Free edition (ADR-0010, ADR-0011):** only the newest 10 ended matches shown (older hidden, never deleted); head-to-head, stats by opponent and day, and series locked; no monthly summary issued. Refused actions open the upgrade offer (Upgrade).
 - Only finished matches count by default; abandoned only when included; cancelled never counts.
 - Matches with archived players are hidden unless included.
 - Head-to-head on the live screen counts every finished match between the two, any game, any style.
@@ -80,6 +82,7 @@ Turns the history of matches into insight: past matches and their timelines, hea
 
 | External Context | Relationship | Translation Needed? |
 |-----------------|--------------|---------------------|
+| Upgrade | Conformist to its open host + published language | No |
 | Matches | Conformist to Matches' published match events | No: takes them as published |
 | Players | Conformist to Players' published player events | No |
 | iOS Notifications | Anti-corruption layer | Yes: adapter at the edge |

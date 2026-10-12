@@ -3,7 +3,7 @@
 **Type:** AUTO
 **Status:** new [?]
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: paid)
 **Actor:** policy (reaction to `FrameWon`)
 **Trigger / interface:** A frame takes a player to the frames target of a set
 **Description:** Winning a set prompts "Callum wins set 2. Continue?" with Continue and Undo. Winning the deciding number of sets prompts Finish / Undo as in scenario 15. The live score reads **(1) 5 – 2 (0)**: sets won in brackets, current-set frames in the middle.
@@ -16,6 +16,7 @@
 - none
 
 ## Rules
+- **Edition (ADR-0010):** Paid (sets). Matches already live when the purchase is revoked (51) keep their style and run to the end
 - Only sets style
 - Sets are a grouping of frames; the break rule carries straight on across sets
 - After a set, current-set frame scores reset to 0–0

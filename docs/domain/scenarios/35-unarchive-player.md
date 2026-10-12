@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: blocked at the Free player cap)
 **Actor:** Scorer
 **Trigger / interface:** Settings → Players (archived) → unarchive
 **Description:** Everything archiving hid comes back as it was.
@@ -15,6 +15,7 @@
 - Player
 
 ## Rules
+- **Edition (ADR-0010):** Free: refused while 5 players are active; opens the upgrade offer (→ 52)
 - Player is archived
 
 ## Flow

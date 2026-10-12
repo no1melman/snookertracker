@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: paid)
 **Actor:** Scorer
 **Trigger / interface:** Stats screen, grouped by day of the week
 **Description:** Same figures as scenario 18, grouped by the weekday matches were played (e.g. every-other-Friday matches). Combinable with the opponent grouping.
@@ -15,6 +15,7 @@
 - Same filters as scenario 18
 
 ## Rules
+- **Edition (ADR-0010):** Paid. While the edition is Free, this opens the upgrade offer (→ 52)
 - Day of week comes from the match's start time
 - Same inclusion rules as scenario 18
 

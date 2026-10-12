@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: paid, except after an auto-pause)
 **Actor:** Scorer
 **Trigger / interface:** Live match screen: resume button; or "resume" in the stale-match prompt (28)
 **Description:** Restarts the match timer, the frame timer and the long-frame warning timer.
@@ -17,6 +17,7 @@
 - none
 
 ## Rules
+- **Edition (ADR-0010):** Paid for matches paused by hand. Resuming a match auto-paused after a kill (27), including from the stale prompt (28), stays free
 - Match is paused
 
 ## Flow

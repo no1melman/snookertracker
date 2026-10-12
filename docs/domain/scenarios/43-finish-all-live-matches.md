@@ -3,7 +3,7 @@
 **Type:** YOU
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: paid)
 **Actor:** Scorer
 **Trigger / interface:** Live matches list → Finish all → confirmation
 **Description:** If every live match can be finished, all are finished. Otherwise one dialog says some matches aren't complete and will be marked abandoned; on confirm, finishable ones are finished and the rest abandoned.
@@ -15,6 +15,7 @@
 - Confirmation
 
 ## Rules
+- **Edition (ADR-0010):** Paid (only meaningful with several live matches)
 - Finishable: most frames wins (any time), or a target style whose target is reached
 - Race to / sets short of target → abandoned
 

@@ -3,7 +3,7 @@
 **Type:** AUTO
 **Status:** new
 **Source:** none
-**History:** ADR-0001 (baseline)
+**History:** ADR-0001 (baseline) · ADR-0010 (changed: paid)
 **Actor:** policy (reaction to `MatchStarted`)
 **Trigger / interface:** A match starts with both players the same colour
 **Description:** Asks whether to give one player a random different colour for this match only. Saved player colours don't change.
@@ -16,6 +16,7 @@
 - Yes / no
 
 ## Rules
+- **Edition (ADR-0010):** Paid. Not offered while Free (no colours are shown)
 - Only when both colours match
 
 ## Flow
