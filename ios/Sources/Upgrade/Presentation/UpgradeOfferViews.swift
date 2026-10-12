@@ -66,9 +66,9 @@ public struct UpgradeNowPrompt: View {
 // MARK: - Generic screen (S52: every other paid feature)
 
 public extension View {
-    /// Presents the generic offer screen whenever `router` holds a `.genericScreen` request, and clears
+    /// Presents the offer screen whenever `router` holds a request, and clears
     /// the request when it closes. Attach once, near the root, inside the `upgradePorts` environment.
-    /// `.inPlace` requests are left to the screen that owns the feature (`UpgradeNowPrompt`).
+    /// `.inPlace` features draw their own "Upgrade now" prompt where the feature would be; tapping it lands here.
     func upgradeOfferPresentation(_ router: UpgradeOfferRouter) -> some View {
         modifier(UpgradeOfferPresenter(router: router))
     }
@@ -79,7 +79,7 @@ private struct UpgradeOfferPresenter: ViewModifier {
 
     func body(content: Content) -> some View {
         content.sheet(item: Binding(
-            get: { router.request.flatMap { $0.placement == .genericScreen ? $0 : nil } },
+            get: { router.request },
             set: { if $0 == nil { router.dismiss() } }
         )) { request in
             UpgradeOfferScreen(feature: request.feature)
