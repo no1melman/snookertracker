@@ -23,6 +23,7 @@ var targets: [Target] = [
     // Thin wrapper over the system SQLite3 module, shared by the infrastructure layers (one DB file per device).
     .target(name: "SQLiteSupport", path: "Sources/Shared/SQLiteSupport"),
     .testTarget(name: "EventDispatchTests", dependencies: ["EventDispatch"], path: "Tests/Shared/EventDispatchTests"),
+    .testTarget(name: "DesignSystemTests", dependencies: ["DesignSystem"], path: "Tests/Shared/DesignSystemTests"),
 ]
 
 for c in contexts {

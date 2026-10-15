@@ -32,7 +32,7 @@ targets:
         CFBundleDisplayName: Snooker
         UILaunchScreen: {}
         ITSAppUsesNonExemptEncryption: false
-        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UIApplicationSupportsIndirectInputEvents: true
         NSSupportsLiveActivities: true
     settings:

@@ -11,6 +11,7 @@ public struct LiveMatchView: View {
     let matchID: MatchID
     @Environment(\.matchesPorts) private var ports
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var error: String?
     @State private var ending: EndAction?
     /// Set when Finish was refused short of the target: ask before finishing anyway.
@@ -38,33 +39,37 @@ public struct LiveMatchView: View {
             }
         }
         .errorAlert($error)
-        .onAppear { keepAwake(true) }
-        .onDisappear { keepAwake(false) }
+        .onAppear { keepAwake(true); allowLandscape(true) }
+        .onDisappear { keepAwake(false); allowLandscape(false) }
     }
+
+    /// An iPhone on its side has a compact height: the side-by-side layout (spec 030).
+    private var landscape: Bool { verticalSizeClass == .compact }
 
     @ViewBuilder
     private func content(_ screen: LiveMatchScreen, _ commands: any MatchCommands) -> some View {
         VStack(spacing: 0) {
-            header(screen)
-            HStack(alignment: .top, spacing: 12) {
-                ForEach(screen.sides) { side in
-                    PlayerColumn(side: side, screen: screen, error: $error)
-                }
-            }
-            .padding(.horizontal)
-            .frame(maxHeight: .infinity)
+            // Landscape (spec 030): the clocks move into the navigation bar, so the scores get the height.
+            if !landscape { header(screen) }
+            Scoreboard(screen: screen, landscape: landscape, error: $error)
+                .padding(.horizontal)
+                .frame(maxHeight: .infinity)
             if screen.headToHeadLocked, screen.sides.count == 2 {
                 // Free (S14, S52): greyed, with an upgrade prompt instead of the figures.
-                LockedHeadToHeadStrip { ports?.showUpgradeOffer(.headToHead) }
+                LockedHeadToHeadStrip(compact: landscape) { ports?.showUpgradeOffer(.headToHead) }
             } else if let lookup = ports?.headToHead, screen.sides.count == 2 {
                 let record = lookup(screen.sides[0].id, screen.sides[1].id)
-                if !record.isEmpty { HeadToHeadStrip(record: record, sides: screen.sides) }
+                if !record.isEmpty { HeadToHeadStrip(record: record, sides: screen.sides, compact: landscape) }
             }
-            if screen.isPaused { pausedBar(screen, commands) }
+            // Landscape: "Paused" shows in the navigation bar and Resume stays in the toolbar.
+            if screen.isPaused, !landscape { pausedBar(screen, commands) }
         }
         .navigationTitle(screen.style.title)
         .inlineTitle()
         .toolbar {
+            if landscape {
+                ToolbarItem(placement: .principal) { header(screen) }
+            }
             ToolbarItem(placement: .primaryAction) {
                 if screen.isPaused {
                     if screen.controls.resumeOffersUpgrade {
@@ -175,7 +180,9 @@ public struct LiveMatchView: View {
 
     private func header(_ screen: LiveMatchScreen) -> some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            VStack(spacing: 4) {
+            // Landscape (spec 030): one line, so the scores get the height.
+            let layout = landscape ? AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 12)) : AnyLayout(VStackLayout(spacing: 4))
+            layout {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Frame \(screen.frameNumber)")
                         .font(.headline)
@@ -189,7 +196,14 @@ public struct LiveMatchView: View {
                     Text("·")
                     Text(screen.game.title)
                     Text("·")
-                    Text(screen.startedAt, format: .dateTime.weekday(.abbreviated).hour().minute())
+                    if landscape {
+                        Text(screen.style.title)
+                    } else {
+                        Text(screen.startedAt, format: .dateTime.weekday(.abbreviated).hour().minute())
+                    }
+                    if landscape, screen.isPaused {
+                        Text("Paused").fontWeight(.semibold).foregroundStyle(.orange)
+                    }
                 }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -205,11 +219,12 @@ public struct LiveMatchView: View {
             ].compactMap { $0 }.joined(separator: ". "))
             .accessibilityAddTraits(.isHeader)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, landscape ? 0 : 12)
     }
 
     private func pausedBar(_ screen: LiveMatchScreen, _ commands: any MatchCommands) -> some View {
-        VStack(spacing: 8) {
+        let layout = landscape ? AnyLayout(HStackLayout(spacing: 16)) : AnyLayout(VStackLayout(spacing: 8))
+        return layout {
             Label("Paused", systemImage: "pause.circle.fill")
                 .font(.headline)
                 .foregroundStyle(.orange)
@@ -228,7 +243,7 @@ public struct LiveMatchView: View {
             }
             .buttonStyle(.borderedProminent)
         }
-        .padding()
+        .padding(landscape ? 8 : 16)
         .background(.bar)
     }
 
@@ -285,56 +300,192 @@ public struct LiveMatchView: View {
         UIApplication.shared.isIdleTimerDisabled = on
         #endif
     }
+
+    /// Only this screen turns sideways; leaving it puts the app back in portrait (spec 030).
+    private func allowLandscape(_ on: Bool) {
+        #if canImport(UIKit)
+        OrientationLock.allowLandscape(on)
+        #endif
+    }
 }
 
-/// One player's column: plate, name, breaker dot, huge score, big +, smaller −.
-struct PlayerColumn: View {
-    let side: LiveSide
+/// The players and their scores (spec 030). The breaker's column and score are a little bigger, the
+/// + and − are the same size on both sides, and a score keeps its size whatever its number of digits.
+/// Portrait: a column per player with the buttons underneath. Landscape: side by side, with each
+/// player's buttons on the outer edge next to their score.
+struct Scoreboard: View {
     let screen: LiveMatchScreen
+    let landscape: Bool
     @Binding var error: String?
-    @Environment(\.matchesPorts) private var ports
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .largeTitle) private var heroSize: CGFloat = 190
     @ScaledMetric(relativeTo: .largeTitle) private var plusHeight: CGFloat = 96
+    @ScaledMetric(relativeTo: .title) private var setsHeight: CGFloat = 40
+    @ScaledMetric(relativeTo: .title2) private var landscapeButtons: CGFloat = 120
+
+    private let spacing: CGFloat = 12
+    private var breaker: Int? { screen.sides.firstIndex(where: \.isBreaker) }
+    private var sides: [(offset: Int, element: LiveSide)] { Array(screen.sides.enumerated()) }
+
+    var body: some View {
+        GeometryReader { geo in
+            // A match is two players; anything else keeps the columns.
+            if landscape, screen.sides.count == 2 { sideBySide(geo.size.width) } else { columns(geo.size.width) }
+        }
+        .animation(reduceMotion ? nil : .snappy, value: breaker)
+    }
+
+    /// Rows of names, scores and buttons sharing the column widths; the scores take the height left over.
+    private func columns(_ width: CGFloat) -> some View {
+        let scoreWidth = width - gaps
+        let widths = columnWidths(scoreWidth)
+        let buttonWidth = widths.min() ?? 0
+        return VStack(spacing: spacing) {
+            headings(widths, compact: false)
+            scores(scoreWidth, widths, cap: heroSize)
+            HStack(alignment: .top, spacing: spacing) {
+                ForEach(sides, id: \.element.id) { i, side in
+                    FrameButtons(side: side, screen: screen, error: $error, plusHeight: plusHeight, fills: false)
+                        .frame(width: buttonWidth)
+                        .frame(width: widths[i])
+                }
+            }
+        }
+        .padding(.bottom)
+    }
+
+    /// Each player's buttons on the outer edge, the names and scores between them.
+    private func sideBySide(_ width: CGFloat) -> some View {
+        let scoreWidth = width - 2 * landscapeButtons - 2 * spacing - gaps
+        let widths = columnWidths(scoreWidth)
+        return HStack(spacing: spacing) {
+            buttons(screen.sides[0])
+            VStack(spacing: spacing) {
+                headings(widths, compact: true)
+                // Landscape scores are meant to be much bigger: the hero size isn't the limit here, the height is.
+                scores(scoreWidth, widths, cap: heroSize * 2)
+            }
+            buttons(screen.sides[1])
+        }
+    }
+
+    private var gaps: CGFloat { spacing * CGFloat(max(screen.sides.count - 1, 0)) }
+
+    private func columnWidths(_ scoreWidth: CGFloat) -> [CGFloat] {
+        ScoreboardSizing(width: scoreWidth, height: 0, breaker: breaker, sides: screen.sides.count, cap: heroSize).widths
+    }
+
+    private func headings(_ widths: [CGFloat], compact: Bool) -> some View {
+        HStack(alignment: .top, spacing: spacing) {
+            ForEach(sides, id: \.element.id) { i, side in
+                PlayerHeading(side: side, emphasised: emphasised(i), compact: compact)
+                    .frame(width: widths[i])
+            }
+        }
+    }
+
+    /// Sized from the height actually left, so nothing above or below is squeezed to make room.
+    private func scores(_ scoreWidth: CGFloat, _ widths: [CGFloat], cap: CGFloat) -> some View {
+        GeometryReader { geo in
+            let sets = screen.sides.contains { $0.sets != nil } ? setsHeight : 0
+            let sizing = ScoreboardSizing(width: scoreWidth, height: geo.size.height - sets,
+                                          breaker: breaker, sides: screen.sides.count, cap: cap)
+            HStack(alignment: .firstTextBaseline, spacing: spacing) {
+                ForEach(sides, id: \.element.id) { i, side in
+                    PlayerScore(side: side, screen: screen, points: sizing.fontSizes[i])
+                        .frame(width: widths[i])
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+    }
+
+    private func buttons(_ side: LiveSide) -> some View {
+        FrameButtons(side: side, screen: screen, error: $error, plusHeight: plusHeight, fills: true)
+            .frame(width: landscapeButtons)
+            .padding(.vertical, spacing)
+    }
+
+    /// Two sides only: nil before a breaker is chosen, so both read the same.
+    private func emphasised(_ i: Int) -> Bool? {
+        guard let breaker, screen.sides.count == 2 else { return nil }
+        return i == breaker
+    }
+}
+
+/// Plate, name and breaker dot. The breaker's name is a size up from the other player's.
+struct PlayerHeading: View {
+    let side: LiveSide
+    /// true for the breaker, false for the other player, nil when neither is emphasised.
+    let emphasised: Bool?
+    /// Landscape: a thinner plate, to leave the height to the score.
+    var compact = false
 
     var body: some View {
         // Free: no colours shown (ADR-0010).
         let colour = side.showsColour ? PlayerColour.color(side.colour) : Color.secondary.opacity(0.3)
-        VStack(spacing: 12) {
-            VStack(spacing: 8) {
-                Capsule().fill(colour).frame(height: 8)
-                HStack(spacing: 6) {
-                    Text(side.name)
-                        .font(.title2.weight(.semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                    Circle()
-                        .fill(side.isBreaker ? Color.primary : .clear)
-                        .frame(width: 10, height: 10)
-                }
+        VStack(spacing: compact ? 4 : 8) {
+            Capsule().fill(colour).frame(height: compact ? 6 : 8)
+            HStack(spacing: 6) {
+                Text(side.name)
+                    .font(emphasised == false ? .title3.weight(.semibold) : .title2.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Circle()
+                    .fill(side.isBreaker ? Color.primary : .clear)
+                    .frame(width: 10, height: 10)
             }
-            .accessibilityHidden(true)
-            // Sets (S16): current-set frames, with sets won in brackets underneath.
-            ScoreNumeral(side.scoreFrames, size: .hero)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// The score at an exact size, never shrunk to fit; sets (S16) show sets won in brackets underneath.
+struct PlayerScore: View {
+    let side: LiveSide
+    let screen: LiveMatchScreen
+    let points: CGFloat
+
+    var body: some View {
+        VStack(spacing: 4) {
+            ScoreNumeral(side.scoreFrames, size: .points(points))
                 .foregroundStyle(screen.isPaused ? .secondary : .primary)
                 .frame(maxWidth: .infinity)
                 .animation(.snappy, value: side.scoreFrames)
-                .accessibilityHidden(true)
             if let sets = side.sets {
                 Text("(\(sets.setsWon))")
                     .font(.title.weight(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
             }
-            Spacer(minLength: 0)
+        }
+        .accessibilityHidden(true)
+        .sensoryFeedback(trigger: side.frames) { old, new in new > old ? .increase : .decrease }
+    }
+}
+
+/// "X breaks" before a breaker is chosen, then a big + and a smaller −. The same size for both players.
+struct FrameButtons: View {
+    let side: LiveSide
+    let screen: LiveMatchScreen
+    @Binding var error: String?
+    let plusHeight: CGFloat
+    /// Landscape: the + grows to fill the height beside the score.
+    let fills: Bool
+    @Environment(\.matchesPorts) private var ports
+
+    var body: some View {
+        VStack(spacing: 12) {
             if screen.controls.chooseBreaker {
                 Button {
                     attempt($error) { try ports?.commands.chooseBreaker(screen.id, player: side.id) }
                 } label: {
                     Text("\(side.name) breaks")
                         .font(.title3.weight(.semibold))
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .minimumScaleFactor(0.6)
-                        .frame(maxWidth: .infinity, minHeight: plusHeight)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity, minHeight: fills ? 44 : plusHeight, maxHeight: fills ? .infinity : nil)
                 }
                 .buttonStyle(.borderedProminent)
             } else {
@@ -343,7 +494,7 @@ struct PlayerColumn: View {
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 44, weight: .bold))
-                        .frame(maxWidth: .infinity, minHeight: plusHeight)
+                        .frame(maxWidth: .infinity, minHeight: fills ? 44 : plusHeight, maxHeight: fills ? .infinity : nil)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!screen.controls.award)
@@ -361,20 +512,18 @@ struct PlayerColumn: View {
                 .accessibilityLabel("Take a frame off \(side.name)")
             }
         }
-        .padding(.bottom)
-        .sensoryFeedback(trigger: side.frames) { old, new in new > old ? .increase : .decrease }
-        // The score is read once, as "Asher 4, Me 3", by the header; the column holds the buttons.
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(side.name)
     }
 }
 
 /// Free (S14, S52): the head-to-head strip, greyed, with an upgrade prompt instead of the figures.
+/// Compact (landscape, spec 030): one line.
 struct LockedHeadToHeadStrip: View {
+    var compact = false
     let upgrade: () -> Void
 
     var body: some View {
-        VStack(spacing: 6) {
+        let layout = compact ? AnyLayout(HStackLayout(spacing: 12)) : AnyLayout(VStackLayout(spacing: 6))
+        layout {
             Text("Head to head")
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(.secondary)
@@ -387,7 +536,7 @@ struct LockedHeadToHeadStrip: View {
             .buttonStyle(.borderless)
         }
         .padding(.horizontal)
-        .padding(.vertical, 10)
+        .padding(.vertical, compact ? 0 : 10)
         .frame(maxWidth: .infinity)
         .background(.quaternary.opacity(0.5))
         .foregroundStyle(.secondary)
@@ -396,26 +545,47 @@ struct LockedHeadToHeadStrip: View {
 
 /// The all-time head-to-head (S14) under the columns, from each column's point of view: matches,
 /// frames, and deciders only when there are any. Hidden when the players have no finished match.
+/// Compact (landscape, spec 030): one line, "Matches 5 – 3 · Frames 20 – 14".
 struct HeadToHeadStrip: View {
     let record: LiveHeadToHead
     let sides: [LiveSide]
+    var compact = false
 
     var body: some View {
-        VStack(spacing: 6) {
-            Text(record.drawn > 0 ? "Head to head · \(record.drawn) drawn" : "Head to head")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-            row("Matches", record.won, record.lost)
-            row("Frames", record.framesWon, record.framesLost)
-            if record.showsDeciders { row("Deciders", record.decidersWon, record.decidersLost) }
+        Group {
+            if compact {
+                HStack(spacing: 16) {
+                    Text(title)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    pair("Matches", record.won, record.lost)
+                    pair("Frames", record.framesWon, record.framesLost)
+                    if record.showsDeciders { pair("Deciders", record.decidersWon, record.decidersLost) }
+                }
+                .padding(.vertical, 8)
+            } else {
+                VStack(spacing: 6) {
+                    Text(title)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    row("Matches", record.won, record.lost)
+                    row("Frames", record.framesWon, record.framesLost)
+                    if record.showsDeciders { row("Deciders", record.decidersWon, record.decidersLost) }
+                }
+                .padding(.vertical, 10)
+            }
         }
         .padding(.horizontal)
-        .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
         .background(.quaternary.opacity(0.5))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(spoken)
+    }
+
+    private var title: String {
+        record.drawn > 0 ? "Head to head · \(record.drawn) drawn" : "Head to head"
     }
 
     private func row(_ title: String, _ first: Int, _ second: Int) -> some View {
@@ -426,6 +596,13 @@ struct HeadToHeadStrip: View {
         }
         .font(.headline)
         .monospacedDigit()
+    }
+
+    private func pair(_ title: String, _ first: Int, _ second: Int) -> some View {
+        HStack(spacing: 6) {
+            Text(title).font(.subheadline).foregroundStyle(.secondary)
+            Text("\(first) – \(second)").font(.headline).monospacedDigit()
+        }
     }
 
     /// "Head to head: Asher won 5, Me won 3, 1 drawn. Frames 20 to 14. Deciders 3 to 1."

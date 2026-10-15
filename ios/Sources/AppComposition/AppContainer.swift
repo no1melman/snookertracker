@@ -166,6 +166,9 @@ final class AppContainer {
     private func askForNotificationsOnFirstMatch() {
         #if canImport(UserNotifications)
         UNUserNotificationCenter.current().delegate = banners
+        #if DEBUG
+        if Self.isDemo { return }  // the system prompt would cover screenshots
+        #endif
         var asked = false
         dispatcher.subscribe(MatchEventPublished.self) { [notifications, warnLongFrame] event in
             guard event.type == "MatchStarted", !asked else { return }
@@ -281,13 +284,19 @@ final class PlayersForMatches: MatchPlayerDirectory {
 
 #if DEBUG
 extension AppContainer {
-    /// Screenshot aid only: `-uiDemo` seeds two players and a live match. Only seeds when no Me exists yet, so it persists like any other data.
+    /// Screenshot aid only, seeded once (when no Me exists yet) so it persists like any other data.
+    /// `-uiDemo` unlocks the edition first, through the same use case a verified App Store
+    /// transaction takes, so every paid feature has content; `-uiDemo -uiFree` stays Free and seeds
+    /// only what the Free limits allow (ADR-0010).
     func seedDemoIfRequested() {
-        guard ProcessInfo.processInfo.arguments.contains("-uiDemo"), players.me == nil else { return }
+        guard Self.isDemo, players.me == nil else { return }
+        let free = ProcessInfo.processInfo.arguments.contains("-uiFree")
+        if !free { try? upgrade.handleAppStoreUpdate(.verified) }
         guard let me = try? players.addPlayer(named: "Callum", colour: "blue"),
               let asher = try? players.addPlayer(named: "Asher", colour: "orange") else { return }
         guard let dev = try? players.addPlayer(named: "Dev", colour: "green") else { return }
         try? players.setMe(me)
+        if free { return seedFreeDemo(me: me, asher: asher, dev: dev) }
         let matches = matchCommands
         guard let m = try? matches.startMatch(MatchSetup(players: [asher, me], game: .pool, style: .raceTo(5), breakRule: .alternate)) else { return }
         try? matches.chooseBreaker(m, player: asher)
@@ -307,6 +316,22 @@ extension AppContainer {
         }
         seedHistoryDemo(me: me, asher: asher, dev: dev)
     }
+
+    /// `-uiFree`: one ended match, then the single live match (most frames wins, alternate breaks).
+    private func seedFreeDemo(me: PlayerRef, asher: PlayerRef, dev: PlayerRef) {
+        let matches = matchCommands
+        if let done = try? matches.startMatch(MatchSetup(players: [me, dev], game: .snooker, style: .mostFramesWins, breakRule: .alternate)) {
+            try? matches.chooseBreaker(done, player: dev)
+            for p in [dev, me, me] { try? matches.awardFrame(done, to: p) }
+            try? matches.finishMatch(done, anyway: false)
+        }
+        guard let m = try? matches.startMatch(MatchSetup(players: [asher, me], game: .pool, style: .mostFramesWins, breakRule: .alternate)) else { return }
+        try? matches.chooseBreaker(m, player: asher)
+        for p in [asher, me, asher, asher, me] { try? matches.awardFrame(m, to: p) }
+    }
+
+    /// Launched with `-uiDemo` (screenshots): also skips the notification permission prompt.
+    static var isDemo: Bool { ProcessInfo.processInfo.arguments.contains("-uiDemo") }
 
     /// `-uiRoute live|newGame|players|settings|history|match` opens that screen at launch.
     var demoRoute: String? {

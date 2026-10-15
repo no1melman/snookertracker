@@ -6,6 +6,9 @@ public enum ScoreSize: Sendable {
     case row
     /// The live screen; must read from the rail, 1–3 m away.
     case hero
+    /// The live scoreboard (spec 030): an exact size from `ScoreboardSizing`, never shrunk to fit, so a
+    /// score keeps its size whatever its number of digits.
+    case points(CGFloat)
 }
 
 public struct ScoreNumeral: View {
@@ -24,20 +27,18 @@ public struct ScoreNumeral: View {
             .monospacedDigit()
             .contentTransition(.numericText(value: Double(value)))
             .lineLimit(1)
-            .minimumScaleFactor(0.5)
+            .minimumScaleFactor(shrinks ? 0.5 : 1)
+    }
+
+    private var shrinks: Bool {
+        if case .points = size { false } else { true }
     }
 
     private var font: Font {
         switch size {
         case .row: .title2.weight(.semibold)
         case .hero: .system(size: heroSize, weight: .bold, design: .rounded)
+        case let .points(points): .system(size: points, weight: .bold, design: .rounded)
         }
-    }
-}
-
-#Preview {
-    HStack(spacing: 40) {
-        ScoreNumeral(4, size: .hero)
-        ScoreNumeral(3, size: .hero)
     }
 }
